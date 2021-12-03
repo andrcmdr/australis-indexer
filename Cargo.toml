@@ -2,25 +2,33 @@
 name = "aurora-indexer"
 version = "0.1.0"
 authors = ["Aurora <hello@aurora.dev>"]
-edition = "2018"
-# edition = "2021"
-rust-version = "1.51.0"
+# edition = "2018"
+edition = "2021"
+# rust-version = "1.51.0"
+rust-version = "1.56.0"
 description = "Aurora Indexer is an events listener for NEAR's on-chain events, based on NEAR Indexer Framework. Provides publishing (as producer) of CBOR encoded messages about on-chain events with streaming messages to the Aurora Bus, NATS based service-oriented bus (MOM/MQ), for other services (as consumers/subscribers)."
 homepage = "https://github.com/aurora-is-near/aurora-indexer"
 repository = "https://github.com/aurora-is-near/aurora-indexer"
-license = "CC0-1.0"
+license = "GPLv3"
 # license-file = "LICENSE"
 publish = false
 
 [dependencies]
 # near-indexer = { git = "https://github.com/near/nearcore", rev = "a668e4399655af513b0d90e0be694dad2448e6cd" }
-near-indexer = { git = "https://github.com/near/nearcore", rev = "e2b0c81ff02f9b3605146931791177a1770d5a5b" }
-# near-indexer = { git = "https://github.com/near/nearcore", rev = "e72782fe61122049fca63b41fa4e53a21e40bc57" }
+# near-indexer = { git = "https://github.com/near/nearcore", rev = "e2b0c81ff02f9b3605146931791177a1770d5a5b" }
+near-indexer = { git = "https://github.com/near/nearcore", rev = "e72782fe61122049fca63b41fa4e53a21e40bc57" }
+
+clap = "3.0.0-beta.1"
+openssl-probe = "0.1.2"
+
 actix = "=0.11.0-beta.2"
-openssl-probe = { version = "0.1.2" }
 tokio = { version = "1.1", features = ["sync"] }
-serde = { version = "1", features = [ "derive" ] }
+
+# serde = { version = "1", features = [ "derive" ] }
 serde_json = "1.0.55"
+
+tracing = "0.1.13"
+tracing-subscriber = "0.2.4"
 
 [dev-dependencies]
 

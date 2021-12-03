@@ -5,6 +5,7 @@
   "node_key_file": "node_key.json",
   "rpc": {
     "addr": "0.0.0.0:3030",
+    "prometheus_addr": null,
     "cors_allowed_origins": [
       "*"
     ],

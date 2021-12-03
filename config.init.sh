@@ -8,6 +8,8 @@ shopt -s extquote
 set -f
 
 read -n 1 -s -p "Proceed with indexer initial configuration? [press any key to continue] : " choice
+echo -e "\n"
 
 ./target/debug/aurora-indexer init
 # ./target/release/aurora-indexer init
+
