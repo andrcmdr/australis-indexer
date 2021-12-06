@@ -2,6 +2,7 @@ use actix;
 use clap::Clap;
 use configs::{init_logging, Opts, SubCommand};
 use near_indexer;
+use serde_cbor as cbor;
 use tokio::sync::mpsc;
 use tracing::info;
 
@@ -258,6 +259,11 @@ async fn listen_blocks(mut stream: mpsc::Receiver<near_indexer::StreamerMessage>
         );
 
         eprintln!(
+            "block_header: {:?}",
+            cbor::to_vec(&streamer_message.block.header).unwrap()
+        );
+
+        eprintln!(
             "block_header_chunks#: {}",
             streamer_message.block.chunks.len()
         );
@@ -265,7 +271,8 @@ async fn listen_blocks(mut stream: mpsc::Receiver<near_indexer::StreamerMessage>
             eprintln!(
                 "block_header_chunk: {}",
                 serde_json::to_value(chunk).unwrap()
-            )
+            );
+            eprintln!("block_header_chunk: {:?}", cbor::to_vec(&chunk).unwrap());
         });
 
         eprintln!("shards#: {}", streamer_message.shards.len());
@@ -275,7 +282,11 @@ async fn listen_blocks(mut stream: mpsc::Receiver<near_indexer::StreamerMessage>
                 eprintln!(
                     "shard_chunk_header: {}",
                     serde_json::to_value(chunk.header.to_owned()).unwrap()
-                )
+                );
+                eprintln!(
+                    "shard_chunk_header: {:?}",
+                    cbor::to_vec(&chunk.header).unwrap()
+                );
             } else {
                 eprintln!("shard_chunk_header: None")
             }
@@ -293,7 +304,11 @@ async fn listen_blocks(mut stream: mpsc::Receiver<near_indexer::StreamerMessage>
                 eprintln!(
                     "Transactions: {}",
                     serde_json::to_value(chunk.transactions.to_owned()).unwrap()
-                )
+                );
+                eprintln!(
+                    "Transactions: {:?}",
+                    cbor::to_vec(&chunk.transactions).unwrap()
+                );
             } else {
                 eprintln!("Transactions: None")
             }
@@ -311,7 +326,8 @@ async fn listen_blocks(mut stream: mpsc::Receiver<near_indexer::StreamerMessage>
                 eprintln!(
                     "Receipts: {}",
                     serde_json::to_value(chunk.receipts.to_owned()).unwrap()
-                )
+                );
+                eprintln!("Receipts: {:?}", cbor::to_vec(&chunk.receipts).unwrap());
             } else {
                 eprintln!("Receipts: None")
             }
@@ -327,7 +343,11 @@ async fn listen_blocks(mut stream: mpsc::Receiver<near_indexer::StreamerMessage>
             eprintln!(
                 "ReceiptExecutionOutcome: {}",
                 serde_json::to_value(shard.receipt_execution_outcomes.to_owned()).unwrap()
-            )
+            );
+            eprintln!(
+                "ReceiptExecutionOutcome: {:?}",
+                cbor::to_vec(&shard.receipt_execution_outcomes).unwrap()
+            );
         });
 
         eprintln!("StateChanges#: {}", streamer_message.state_changes.len());
@@ -338,7 +358,8 @@ async fn listen_blocks(mut stream: mpsc::Receiver<near_indexer::StreamerMessage>
                 eprintln!(
                     "StateChange: {}",
                     serde_json::to_value(state_change).unwrap()
-                )
+                );
+                eprintln!("StateChange: {:?}", cbor::to_vec(&state_change).unwrap());
             });
     }
 }
