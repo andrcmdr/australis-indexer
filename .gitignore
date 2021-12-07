@@ -4,6 +4,9 @@ target/
 # NEAR State
 .near/data/
 
+# Aurora Indexer State
+.aurora-indexer/data/
+
 # Visual Studio Code
 .vscode/
 .run/
@@ -17,3 +20,4 @@ target/
 
 # macOS
 .DS_Store
+

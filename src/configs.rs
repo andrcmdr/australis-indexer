@@ -4,12 +4,16 @@ use near_indexer::near_primitives::types::Gas;
 
 use tracing_subscriber::EnvFilter;
 
+use core::str::FromStr;
+
+type Error = Box<dyn std::error::Error + 'static>;
+
 /// CLI options (subcommands and flags)
 #[derive(Clap, Debug)]
 #[clap(version = "0.1.0", author = "Aurora <hello@aurora.dev>")]
 #[clap(setting = AppSettings::SubcommandRequiredElseHelp)]
 pub(crate) struct Opts {
-    /// Custom directory for configurations. Defaults to ./.near/
+    /// Custom directory for configurations and state. Defaults to ./.aurora-indexer/
     #[clap(short, long)]
     pub home_dir: Option<std::path::PathBuf>,
     /// Subcommand
@@ -20,10 +24,42 @@ pub(crate) struct Opts {
 /// CLI subcommands
 #[derive(Clap, Debug)]
 pub(crate) enum SubCommand {
-    /// Run NEAR Indexer. Sync from the network.
-    Run,
+    /// Run Aurora Indexer. Sync from the network.
+    Run(RunArgs),
     /// Initialize configurations.
     Init(InitConfigArgs),
+}
+
+/// CLI options to run Aurora Indexer
+#[derive(Clap, Debug)]
+pub(crate) struct RunArgs {
+    /// Path to NATS credentials (JWT/NKEY tokens)
+    #[clap(short, long)]
+    pub creds_path: Option<std::path::PathBuf>,
+    /// Aurora Borealis (NATS based MOM/MQ/SOA service bus) address:port
+    #[clap(long, default_value = "tls://borealis.aurora:4443")]
+    pub nats_server: String,
+    /// Streaming messages format
+    #[clap(long, default_value = "cbor")]
+    pub msg_format: MsgFormat,
+}
+
+/// Streaming messages format
+#[derive(Clap, Debug)]
+pub(crate) enum MsgFormat {
+    CBOR,
+    JSON,
+}
+
+impl FromStr for MsgFormat {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "CBOR" => Ok(MsgFormat::CBOR),
+            "JSON" => Ok(MsgFormat::JSON),
+            _ => Err(format!("Unknown message format: `--msg-fomat` should contain `CBOR` or `JSON`").into()),
+        }
+    }
 }
 
 /// Override standard config args with CLI options
@@ -47,19 +83,20 @@ pub(crate) struct InitConfigArgs {
     /// Genesis file to use when initialize testnet (including downloading)
     #[clap(short, long)]
     pub genesis: Option<String>,
-    #[clap(long)]
     /// Download the verified NEAR genesis file automatically.
+    #[clap(long)]
     pub download_genesis: bool,
     /// Specify a custom download URL for the genesis-file.
     #[clap(long)]
     pub download_genesis_url: Option<String>,
-    #[clap(long)]
     /// Download the verified NEAR config file automatically.
+    #[clap(long)]
     pub download_config: bool,
     /// Specify a custom download URL for the config file.
     #[clap(long)]
     pub download_config_url: Option<String>,
     /// Specify the boot nodes to bootstrap the network
+    #[clap(long)]
     pub boot_nodes: Option<String>,
     /// Specify a custom max_gas_burnt_view limit.
     #[clap(long)]
