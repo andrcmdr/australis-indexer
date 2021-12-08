@@ -1,7 +1,7 @@
 {
   "protocol_version": 49,
-  "genesis_time": "2021-12-09T13:17:21.740648124Z",
-  "chain_id": "test-chain-r1xQC",
+  "genesis_time": "2021-12-10T23:14:52.436800044Z",
+  "chain_id": "test-chain-5nEoz",
   "genesis_height": 0,
   "num_block_producer_seats": 50,
   "num_block_producer_seats_per_shard": [
@@ -37,7 +37,7 @@
   "validators": [
     {
       "account_id": "test.near",
-      "public_key": "ed25519:H1rT6sgL1AHSMbCYE1Qa2rsmMP8wWJ7oGCSMForcPc5c",
+      "public_key": "ed25519:4SPhkRGZfbGf2Z7uTz4NYp5RUq1t14gQK51Aiaax6ur2",
       "amount": "50000000000000000000000000000000"
     }
   ],
@@ -82,7 +82,7 @@
     {
       "AccessKey": {
         "account_id": "test.near",
-        "public_key": "ed25519:H1rT6sgL1AHSMbCYE1Qa2rsmMP8wWJ7oGCSMForcPc5c",
+        "public_key": "ed25519:4SPhkRGZfbGf2Z7uTz4NYp5RUq1t14gQK51Aiaax6ur2",
         "access_key": {
           "nonce": 0,
           "permission": "FullAccess"

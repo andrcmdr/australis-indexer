@@ -1,5 +1,5 @@
 use clap::Clap;
-use configs::{init_logging, Opts, SubCommand};
+use configs::{init_logging, Opts, SubCommand, MsgFormat};
 use actix;
 use tokio::sync::mpsc;
 use tracing::info;
@@ -10,8 +10,8 @@ use serde_cbor as cbor;
 
 mod configs;
 
-async fn message_producer(mut events_stream: mpsc::Receiver<near_indexer::StreamerMessage>) {
-    while let Some(streamer_message) =events_stream.recv().await {
+async fn message_producer(mut events_stream: mpsc::Receiver<near_indexer::StreamerMessage>, nc: nats::Connection, msg_format: MsgFormat) {
+    while let Some(streamer_message) = events_stream.recv().await {
         /*
             Example of `StreamerMessage` with all data fields (filled with synthetic data, as an example):
 
@@ -245,7 +245,17 @@ async fn message_producer(mut events_stream: mpsc::Receiver<near_indexer::Stream
             }
         */
 
-        // Data handling from `StreamerMessage` data structure.
+        // Stream message to NATS
+        match msg_format {
+            MsgFormat::Cbor => {
+                nc.publish("Index.Blocks.StreamerMessages.CBOR", cbor::to_vec(&streamer_message).unwrap()).expect("[CBOR bytes vector] Message passing error");
+            }
+            MsgFormat::Json => {
+                nc.publish("Index.Blocks.StreamerMessages.JSON", serde_json::to_vec(&streamer_message).unwrap()).expect("[JSON bytes vector] Message passing error");
+            }
+        }
+
+        // Data handling from `StreamerMessage` data structure. For custom filtering purposes.
         // jq '{block_height: .block.header.height, block_hash: .block.header.hash, block_header_chunk: .block.chunks[0], shard_chunk_header: .shards[0].chunk.header, transactions: .shards[0].chunk.transactions, receipts: .shards[0].chunk.receipts, receipt_execution_outcomes: .shards[0].receipt_execution_outcomes, state_changes: .state_changes}'
 
         info!(
@@ -397,16 +407,28 @@ fn main() {
         SubCommand::Run(run_args) => {
             let indexer_config = near_indexer::IndexerConfig {
                 home_dir,
-                sync_mode: near_indexer::SyncModeEnum::FromInterruption, // recover and continue message streaming from latest syncing block
+                // recover and continue message streaming from latest syncing block
+                sync_mode: near_indexer::SyncModeEnum::FromInterruption,
                 // await_for_node_synced: near_indexer::AwaitForNodeSyncedEnum::WaitForFullSync,
-                await_for_node_synced: near_indexer::AwaitForNodeSyncedEnum::StreamWhileSyncing, // stream messages while syncing
+                // stream messages while syncing
+                await_for_node_synced: near_indexer::AwaitForNodeSyncedEnum::StreamWhileSyncing,
             };
+
+            let creds_path =   run_args.creds_path.unwrap_or(std::path::PathBuf::from("./.nats/seed/nats.creds"));
+
+            let nats_connection = nats::Options::with_credentials(creds_path)
+                .max_reconnects(30)
+                .disconnect_callback(|| println!("connection has been lost"))
+                .reconnect_callback(|| println!("connection has been reestablished"))
+                .close_callback(|| println!("connection has been closed"))
+                .connect(&run_args.nats_server)
+                .expect("NATS connection error or wrong credentials");
 
             let system = actix::System::new();
             system.block_on(async move {
                 let indexer = near_indexer::Indexer::new(indexer_config);
                 let events_stream = indexer.streamer();
-                actix::spawn(message_producer(events_stream));
+                actix::spawn(message_producer(events_stream, nats_connection, run_args.msg_format));
             });
             system.run().unwrap();
         }

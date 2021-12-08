@@ -36,28 +36,29 @@ pub(crate) struct RunArgs {
     /// Path to NATS credentials (JWT/NKEY tokens)
     #[clap(short, long)]
     pub creds_path: Option<std::path::PathBuf>,
-    /// Aurora Borealis (NATS based MOM/MQ/SOA service bus) address:port
+    /// Aurora Borealis (NATS based MOM/MQ/SOA service bus) protocol://address:port
+    /// Example: "nats://borealis.aurora:4222" or "tls://borealis.aurora:4443" for TLS connection
     #[clap(long, default_value = "tls://borealis.aurora:4443")]
     pub nats_server: String,
     /// Streaming messages format
-    #[clap(long, default_value = "cbor")]
+    #[clap(long, default_value = "CBOR")]
     pub msg_format: MsgFormat,
 }
 
 /// Streaming messages format
 #[derive(Clap, Debug)]
 pub(crate) enum MsgFormat {
-    CBOR,
-    JSON,
+    Cbor,
+    Json,
 }
 
 impl FromStr for MsgFormat {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "CBOR" => Ok(MsgFormat::CBOR),
-            "JSON" => Ok(MsgFormat::JSON),
-            _ => Err(format!("Unknown message format: `--msg-fomat` should contain `CBOR` or `JSON`").into()),
+            "CBOR" | "Cbor" | "cbor" => Ok(MsgFormat::Cbor),
+            "JSON" | "Json" | "json" => Ok(MsgFormat::Json),
+            _ => Err("Unknown message format: `--msg-fomat` should contain `CBOR` or `JSON`".to_string().into()),
         }
     }
 }
