@@ -9,7 +9,7 @@ set -f
 
 if [[ "$1" == "help" || "$1" == "h" || "$1" == "?" || "$1" == "" ]]; then
     echo
-    echo -e "bash $0 [ ? | h | help | fmt | check | build | genconf | run ]\n"
+    echo -e "bash $0 [ help/h/? | fmt | check | build | genconf/init | run ]\n"
 
 elif [[ "$1" == "fmt" ]]; then
 

@@ -1,16 +1,20 @@
-use clap::Clap;
-use configs::{init_logging, Opts, SubCommand, MsgFormat};
 use actix;
+use clap::Clap;
+use configs::{init_logging, MsgFormat, Opts, SubCommand};
+use nats;
+use near_indexer;
+use serde_cbor as cbor;
+use serde_json;
 use tokio::sync::mpsc;
 use tracing::info;
-use near_indexer;
-use nats;
-use serde_json;
-use serde_cbor as cbor;
 
 mod configs;
 
-async fn message_producer(mut events_stream: mpsc::Receiver<near_indexer::StreamerMessage>, nc: nats::Connection, msg_format: MsgFormat) {
+async fn message_producer(
+    mut events_stream: mpsc::Receiver<near_indexer::StreamerMessage>,
+    nc: nats::Connection,
+    msg_format: MsgFormat,
+) {
     while let Some(streamer_message) = events_stream.recv().await {
         /*
             Example of `StreamerMessage` with all data fields (filled with synthetic data, as an example):
@@ -248,10 +252,18 @@ async fn message_producer(mut events_stream: mpsc::Receiver<near_indexer::Stream
         // Stream message to NATS
         match msg_format {
             MsgFormat::Cbor => {
-                nc.publish("Index.Blocks.StreamerMessages.CBOR", cbor::to_vec(&streamer_message).unwrap()).expect("[CBOR bytes vector] Message passing error");
+                nc.publish(
+                    "Index.Blocks.StreamerMessages.CBOR",
+                    cbor::to_vec(&streamer_message).unwrap(),
+                )
+                .expect("[CBOR bytes vector] Message passing error");
             }
             MsgFormat::Json => {
-                nc.publish("Index.Blocks.StreamerMessages.JSON", serde_json::to_vec(&streamer_message).unwrap()).expect("[JSON bytes vector] Message passing error");
+                nc.publish(
+                    "Index.Blocks.StreamerMessages.JSON",
+                    serde_json::to_vec(&streamer_message).unwrap(),
+                )
+                .expect("[JSON bytes vector] Message passing error");
             }
         }
 
@@ -267,8 +279,7 @@ async fn message_producer(mut events_stream: mpsc::Receiver<near_indexer::Stream
 
         eprintln!(
             "block_height: #{}, block_hash: {}\n",
-            streamer_message.block.header.height,
-            streamer_message.block.header.hash
+            streamer_message.block.header.height, streamer_message.block.header.hash
         );
 
         eprintln!(
@@ -285,10 +296,7 @@ async fn message_producer(mut events_stream: mpsc::Receiver<near_indexer::Stream
                 "block_header_chunk: {}\n",
                 serde_json::to_value(chunk).unwrap()
             );
-            eprintln!(
-                "block_header_chunk: {:?}\n",
-                cbor::to_vec(&chunk).unwrap()
-            );
+            eprintln!("block_header_chunk: {:?}\n", cbor::to_vec(&chunk).unwrap());
         });
 
         eprintln!("shards#: {}\n", streamer_message.shards.len());
@@ -343,10 +351,7 @@ async fn message_producer(mut events_stream: mpsc::Receiver<near_indexer::Stream
                     "Receipts: {}\n",
                     serde_json::to_value(chunk.receipts.to_owned()).unwrap()
                 );
-                eprintln!(
-                    "Receipts: {:?}\n",
-                    cbor::to_vec(&chunk.receipts).unwrap()
-                );
+                eprintln!("Receipts: {:?}\n", cbor::to_vec(&chunk.receipts).unwrap());
             } else {
                 eprintln!("Receipts: None\n")
             }
@@ -378,10 +383,7 @@ async fn message_producer(mut events_stream: mpsc::Receiver<near_indexer::Stream
                     "StateChange: {}\n",
                     serde_json::to_value(state_change).unwrap()
                 );
-                eprintln!(
-                    "StateChange: {:?}\n",
-                    cbor::to_vec(&state_change).unwrap()
-                );
+                eprintln!("StateChange: {:?}\n", cbor::to_vec(&state_change).unwrap());
             });
     }
 }
@@ -398,7 +400,9 @@ fn main() {
     let opts: Opts = Opts::parse();
 
     // let home_dir = opts.home_dir.unwrap_or(std::path::PathBuf::from(near_indexer::get_default_home()));
-    let home_dir = opts.home_dir.unwrap_or(std::path::PathBuf::from("./.aurora-indexer"));
+    let home_dir = opts
+        .home_dir
+        .unwrap_or(std::path::PathBuf::from("./.aurora-indexer"));
 
     match opts.subcmd {
         SubCommand::Init(config_args) => {
@@ -414,7 +418,9 @@ fn main() {
                 await_for_node_synced: near_indexer::AwaitForNodeSyncedEnum::StreamWhileSyncing,
             };
 
-            let creds_path =   run_args.creds_path.unwrap_or(std::path::PathBuf::from("./.nats/seed/nats.creds"));
+            let creds_path = run_args
+                .creds_path
+                .unwrap_or(std::path::PathBuf::from("./.nats/seed/nats.creds"));
 
             let nats_connection = nats::Options::with_credentials(creds_path)
                 .max_reconnects(30)
@@ -428,7 +434,11 @@ fn main() {
             system.block_on(async move {
                 let indexer = near_indexer::Indexer::new(indexer_config);
                 let events_stream = indexer.streamer();
-                actix::spawn(message_producer(events_stream, nats_connection, run_args.msg_format));
+                actix::spawn(message_producer(
+                    events_stream,
+                    nats_connection,
+                    run_args.msg_format,
+                ));
             });
             system.run().unwrap();
         }
