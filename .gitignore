@@ -4,8 +4,8 @@ target/
 # NEAR State
 .near/data/
 
-# Aurora Indexer State
-.aurora-indexer/data/
+# Borealis Indexer State
+.borealis-indexer/data/
 
 # Visual Studio Code
 .vscode/

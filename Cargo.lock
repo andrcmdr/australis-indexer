@@ -391,22 +391,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aurora-indexer"
-version = "0.1.0"
-dependencies = [
- "actix",
- "clap",
- "nats",
- "near-indexer",
- "openssl-probe",
- "serde_cbor",
- "serde_json",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "autocfg"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -585,6 +569,38 @@ dependencies = [
  "fastrand",
  "futures-lite",
  "once_cell",
+]
+
+[[package]]
+name = "borealis-consumer"
+version = "0.1.0"
+dependencies = [
+ "actix",
+ "clap",
+ "nats",
+ "near-indexer",
+ "openssl-probe",
+ "serde_cbor",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "borealis-indexer"
+version = "0.1.0"
+dependencies = [
+ "actix",
+ "clap",
+ "nats",
+ "near-indexer",
+ "openssl-probe",
+ "serde_cbor",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

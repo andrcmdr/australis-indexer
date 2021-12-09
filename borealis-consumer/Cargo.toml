@@ -1,0 +1,38 @@
+[package]
+name = "borealis-consumer"
+version = "0.1.0"
+authors = ["Aurora <hello@aurora.dev>"]
+edition = "2021"
+# rust-version = "1.57.0"
+description = "NATS consumer/subscriber for Borealis Bus. Provides consuming (as subcriber) of CBOR (or JSON, for debugging) encoded messages about NEAR's on-chain events from Borealis Bus, NATS based service-oriented bus (MOM/MQ)."
+homepage = "https://github.com/aurora-is-near/aurora-indexer"
+repository = "https://github.com/aurora-is-near/aurora-indexer"
+license = "GPLv3"
+# license-file = "LICENSE"
+publish = false
+
+[dependencies]
+near-indexer = { git = "https://github.com/near/nearcore", rev = "e72782fe61122049fca63b41fa4e53a21e40bc57" }
+nats = "0.16.0"
+
+clap = "3.0.0-beta.1"
+openssl-probe = "0.1.2"
+
+actix = "=0.11.0-beta.2"
+tokio = { version = "1.1", features = ["sync"] }
+
+tracing = "0.1.13"
+tracing-subscriber = "0.2.4"
+
+# serde = { version = "1", features = [ "derive" ] }
+serde_json = "1.0.55"
+serde_cbor = "0.11.2"
+
+[dev-dependencies]
+
+[build-dependencies]
+
+[target]
+
+[features]
+

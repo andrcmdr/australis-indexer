@@ -13,6 +13,7 @@ mod configs;
 async fn message_producer(
     mut events_stream: mpsc::Receiver<near_indexer::StreamerMessage>,
     nc: nats::Connection,
+    subject: String,
     msg_format: MsgFormat,
 ) {
     while let Some(streamer_message) = events_stream.recv().await {
@@ -253,14 +254,14 @@ async fn message_producer(
         match msg_format {
             MsgFormat::Cbor => {
                 nc.publish(
-                    "Index.Blocks.StreamerMessages.CBOR",
+                    format!("{}_CBOR", subject).as_str(),
                     cbor::to_vec(&streamer_message).unwrap(),
                 )
                 .expect("[CBOR bytes vector] Message passing error");
             }
             MsgFormat::Json => {
                 nc.publish(
-                    "Index.Blocks.StreamerMessages.JSON",
+                    format!("{}_JSON", subject).as_str(),
                     serde_json::to_vec(&streamer_message).unwrap(),
                 )
                 .expect("[JSON bytes vector] Message passing error");
@@ -271,7 +272,7 @@ async fn message_producer(
         // jq '{block_height: .block.header.height, block_hash: .block.header.hash, block_header_chunk: .block.chunks[0], shard_chunk_header: .shards[0].chunk.header, transactions: .shards[0].chunk.transactions, receipts: .shards[0].chunk.receipts, receipt_execution_outcomes: .shards[0].receipt_execution_outcomes, state_changes: .state_changes}'
 
         info!(
-            target: "aurora_indexer",
+            target: "borealis_indexer",
             "block_height: #{}, block_hash: {}\n",
             streamer_message.block.header.height,
             streamer_message.block.header.hash
@@ -402,7 +403,7 @@ fn main() {
     // let home_dir = opts.home_dir.unwrap_or(std::path::PathBuf::from(near_indexer::get_default_home()));
     let home_dir = opts
         .home_dir
-        .unwrap_or(std::path::PathBuf::from("./.aurora-indexer"));
+        .unwrap_or(std::path::PathBuf::from("./.borealis-indexer"));
 
     match opts.subcmd {
         SubCommand::Init(config_args) => {
@@ -437,6 +438,7 @@ fn main() {
                 actix::spawn(message_producer(
                     events_stream,
                     nats_connection,
+                    run_args.subject,
                     run_args.msg_format,
                 ));
             });
