@@ -254,14 +254,14 @@ async fn message_producer(
         match msg_format {
             MsgFormat::Cbor => {
                 nc.publish(
-                    format!("{}_CBOR", subject).as_str(),
+                    format!("{}_{:?}", subject, msg_format).as_str(),
                     cbor::to_vec(&streamer_message).unwrap(),
                 )
                 .expect("[CBOR bytes vector] Message passing error");
             }
             MsgFormat::Json => {
                 nc.publish(
-                    format!("{}_JSON", subject).as_str(),
+                    format!("{}_{:?}", subject, msg_format).as_str(),
                     serde_json::to_vec(&streamer_message).unwrap(),
                 )
                 .expect("[JSON bytes vector] Message passing error");

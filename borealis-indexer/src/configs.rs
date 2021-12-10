@@ -43,7 +43,7 @@ pub(crate) struct RunArgs {
     /// Stream messages to subject
     #[clap(long, default_value = "BlockIndex_StreamerMessages")]
     pub subject: String,
-    /// Streaming messages format
+    /// Streaming messages format (`CBOR` or `JSON`)
     #[clap(long, default_value = "CBOR")]
     pub msg_format: MsgFormat,
 }

@@ -16,7 +16,7 @@ elif [[ "$1" == "fmt" ]]; then
     echo "--check works since cargo-fmt 1.4.38"
     cargo fmt -v --all --check ;
 
-    read -n 1 -s -p "Proceed with cargo fmt/check/build? [Enter/y|n] : " choice_fmt
+    read -n 1 -s -p "Proceed with cargo fmt? [Enter/y|n] : " choice_fmt
     echo -e "\n"
 
     if [[ $choice_fmt == "y" || $choice_fmt == "" ]]; then
@@ -71,28 +71,4 @@ elif [[ "$1" == "run" ]]; then
     fi
 
 fi
-
-
-# Examples of how to init & run indexer with custom configuration parameters:
-
-# bash ./make.sh init ...
-# bash ./make.sh run ...
-# or
-# ./target/debug/borealis-indexer --home-dir "some_dir" init ...
-# ./target/debug/borealis-indexer --home-dir "some_dir" run ...
-
-# ./target/debug/borealis-indexer --home-dir ./.near/localnet/ init --chain-id localnet
-# ./target/debug/borealis-indexer --home-dir ./.near/localnet/ run --creds-path "./.nats/seed/nats.creds" --nats-server ("nats://demo.nats.io:4222" | "tls://demo.nats.io:4443") --subject "BlockIndex_StreamerMessages" --msg-format ("CBOR" | "JSON")
-
-# ./target/debug/borealis-indexer --home-dir ./.near/devnet/ init --chain-id devnet
-# ./target/debug/borealis-indexer --home-dir ./.near/devnet/ run --creds-path "./.nats/seed/nats.creds" --nats-server ("nats://demo.nats.io:4222" | "tls://demo.nats.io:4443") --subject "BlockIndex_StreamerMessages" --msg-format ("CBOR" | "JSON")
-
-# ./target/debug/borealis-indexer --home-dir ./.near/testnet/ init --chain-id testnet --boot-nodes "" --download-genesis --download-genesis-url "" --download-config --download-config-url "https://s3-us-west-1.amazonaws.com/build.nearprotocol.com/nearcore-deploy/testnet/config.json"
-# ./target/debug/borealis-indexer --home-dir ./.near/testnet/ run --creds-path "./.nats/seed/nats.creds" --nats-server ("nats://demo.nats.io:4222" | "tls://demo.nats.io:4443") --subject "BlockIndex_StreamerMessages" --msg-format ("CBOR" | "JSON")
-
-# ./target/debug/borealis-indexer --home-dir ./.near/betanet/ init --chain-id betanet --boot-nodes "" --download-genesis --download-genesis-url "" --download-config --download-config-url "https://s3-us-west-1.amazonaws.com/build.nearprotocol.com/nearcore-deploy/betanet/config.json"
-# ./target/debug/borealis-indexer --home-dir ./.near/betanet/ run --creds-path "./.nats/seed/nats.creds" --nats-server ("nats://demo.nats.io:4222" | "tls://demo.nats.io:4443") --subject "BlockIndex_StreamerMessages" --msg-format ("CBOR" | "JSON")
-
-# ./target/debug/borealis-indexer --home-dir ./.near/mainnet/ init --chain-id mainnet --boot-nodes "" --download-genesis --download-genesis-url "" --download-config --download-config-url "https://s3-us-west-1.amazonaws.com/build.nearprotocol.com/nearcore-deploy/mainnet/config.json"
-# ./target/debug/borealis-indexer --home-dir ./.near/mainnet/ run --creds-path "./.nats/seed/nats.creds" --nats-server ("nats://demo.nats.io:4222" | "tls://demo.nats.io:4443") --subject "BlockIndex_StreamerMessages" --msg-format ("CBOR" | "JSON")
 
