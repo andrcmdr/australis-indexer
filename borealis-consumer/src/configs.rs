@@ -11,27 +11,40 @@ type Error = Box<dyn std::error::Error + 'static>;
 #[clap(version = "0.1.0", author = "Aurora <hello@aurora.dev>")]
 #[clap(setting = AppSettings::SubcommandRequiredElseHelp)]
 pub(crate) struct Opts {
-    /// Subcommand
+    /// Subcommands
     #[clap(subcommand)]
     pub subcmd: SubCommand,
 }
 
 /// CLI subcommands
-#[derive(Clap, Debug)]
+#[derive(Clap, Debug, Clone)]
 pub(crate) enum SubCommand {
+//  /// Initialize NATS JetStream consumer and stream configurations
+//  Init,
+    /// Checking connection to NATS
+    Check(RunArgs),
     /// Run Borealis Consumer wirh options
     Run(RunArgs),
 }
 
 /// CLI options to run Borealis Consumer
-#[derive(Clap, Debug)]
+#[derive(Clap, Debug, Clone)]
 pub(crate) struct RunArgs {
+    /// root CA certificate
+    #[clap(long)]
+    pub root_cert_path: Option<std::path::PathBuf>,
+    /// client certificate
+    #[clap(long)]
+    pub client_cert_path: Option<std::path::PathBuf>,
+    /// client private key
+    #[clap(long)]
+    pub client_private_key: Option<std::path::PathBuf>,
     /// Path to NATS credentials (JWT/NKEY tokens)
     #[clap(short, long)]
     pub creds_path: Option<std::path::PathBuf>,
     /// Borealis Bus (NATS based MOM/MQ/SOA service bus) protocol://address:port
     /// Example: "nats://borealis.aurora:4222" or "tls://borealis.aurora:4443" for TLS connection
-    #[clap(long, default_value = "tls://borealis.aurora:4443")]
+    #[clap(long, default_value = "nats://borealis.aurora:4222")]
     pub nats_server: String,
     /// Consumer work mode (standard `Subscriber` or `JetStream` subscriber)
     #[clap(long, default_value = "JetStream")]
@@ -45,7 +58,7 @@ pub(crate) struct RunArgs {
 }
 
 /// Consumer work mode
-#[derive(Clap, Debug)]
+#[derive(Clap, Debug, Clone, Copy)]
 pub(crate) enum WorkMode {
     Subscriber,
     Jetstream,

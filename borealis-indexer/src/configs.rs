@@ -16,29 +16,43 @@ pub(crate) struct Opts {
     /// Custom directory for configurations and state. Defaults to ./.borealis-indexer/
     #[clap(short, long)]
     pub home_dir: Option<std::path::PathBuf>,
-    /// Subcommand
+//  /// Configuration file path
+//  #[clap(short, long)]
+//  pub config_path: Option<std::path::PathBuf>,
+    /// Subcommands
     #[clap(subcommand)]
     pub subcmd: SubCommand,
 }
 
 /// CLI subcommands
-#[derive(Clap, Debug)]
+#[derive(Clap, Debug, Clone)]
 pub(crate) enum SubCommand {
-    /// Run Borealis Indexer. Sync from the network.
-    Run(RunArgs),
-    /// Initialize configurations.
+    /// Initialize Borealis Indexer configuration
     Init(InitConfigArgs),
+    /// Checking connection to NATS
+    Check(RunArgs),
+    /// Run Borealis Indexer with options and sync blocks from the network
+    Run(RunArgs),
 }
 
 /// CLI options to run Borealis Indexer
-#[derive(Clap, Debug)]
+#[derive(Clap, Debug, Clone)]
 pub(crate) struct RunArgs {
+    /// root CA certificate
+    #[clap(long)]
+    pub root_cert_path: Option<std::path::PathBuf>,
+    /// client certificate
+    #[clap(long)]
+    pub client_cert_path: Option<std::path::PathBuf>,
+    /// client private key
+    #[clap(long)]
+    pub client_private_key: Option<std::path::PathBuf>,
     /// Path to NATS credentials (JWT/NKEY tokens)
     #[clap(short, long)]
     pub creds_path: Option<std::path::PathBuf>,
     /// Borealis Bus (NATS based MOM/MQ/SOA service bus) protocol://address:port
     /// Example: "nats://borealis.aurora:4222" or "tls://borealis.aurora:4443" for TLS connection
-    #[clap(long, default_value = "tls://borealis.aurora:4443")]
+    #[clap(long, default_value = "nats://borealis.aurora:4222")]
     pub nats_server: String,
     /// Stream messages to subject
     #[clap(long, default_value = "BlockIndex_StreamerMessages")]
@@ -49,7 +63,7 @@ pub(crate) struct RunArgs {
 }
 
 /// Streaming messages format
-#[derive(Clap, Debug)]
+#[derive(Clap, Debug, Clone, Copy)]
 pub(crate) enum MsgFormat {
     Cbor,
     Json,
@@ -71,7 +85,7 @@ impl FromStr for MsgFormat {
 }
 
 /// Override standard config args with CLI options
-#[derive(Clap, Debug)]
+#[derive(Clap, Debug, Clone)]
 pub(crate) struct InitConfigArgs {
     /// chain/network id (localnet, testnet, devnet, betanet)
     #[clap(short, long)]

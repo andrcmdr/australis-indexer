@@ -61,8 +61,8 @@ elif [[ "$1" == "run" ]]; then
 
     if [[ $choice_run == "y" || $choice_run == "" ]]; then
 
-        ./target/debug/borealis-indexer run  "${@:2}"
-        # ./target/release/borealis-indexer run  "${@:2}"
+        ./target/debug/borealis-indexer run "${@:2}"
+        # ./target/release/borealis-indexer run "${@:2}"
         # | jq '{block_height: .block.header.height, block_hash: .block.header.hash, block_header_chunks: .block.chunks, shard_chunk_header: .shards[0].chunk.header, transactions: .shards[0].chunk.transactions, receipts: .shards[0].chunk.receipts, receipt_execution_outcomes: .shards[0].receipt_execution_outcomes, state_changes: .state_changes}'
 
     else
