@@ -19,8 +19,8 @@ pub(crate) struct Opts {
 /// CLI subcommands
 #[derive(Clap, Debug, Clone)]
 pub(crate) enum SubCommand {
-//  /// Initialize NATS JetStream consumer and stream configurations
-//  Init,
+    /// Initialize NATS JetStream consumer and stream configurations
+    Init(RunArgs),
     /// Checking connection to NATS
     Check(RunArgs),
     /// Run Borealis Consumer wirh options

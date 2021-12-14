@@ -1,6 +1,6 @@
 use actix;
 use clap::Clap;
-use configs::{init_logging, MsgFormat, Opts, SubCommand, RunArgs};
+use configs::{init_logging, MsgFormat, Opts, RunArgs, SubCommand};
 use nats;
 use near_indexer;
 use serde_cbor as cbor;
@@ -395,17 +395,25 @@ fn nats_connect(connect_args: RunArgs) -> nats::Connection {
         .unwrap_or(std::path::PathBuf::from("./.nats/seed/nats.creds"));
 
     let options = {
-        match (connect_args.root_cert_path, connect_args.client_cert_path, connect_args.client_private_key) {
-            (Some(root_cert_path), None, None) => {
-                nats::Options::with_credentials(creds_path)
-                    .tls_required(true)
-                    .add_root_certificate(root_cert_path)
-                    .max_reconnects(30)
-                    .reconnect_callback(|| println!("connection has been reestablished"))
-                    .reconnect_delay_callback(|reconnect_attempt| core::time::Duration::from_millis(std::cmp::min((reconnect_attempt * rand::Rng::gen_range( &mut rand::thread_rng(), 50..100)) as u64, 1000)))
-                    .disconnect_callback(|| println!("connection has been lost"))
-                    .close_callback(|| println!("connection has been closed"))
-            },
+        match (
+            connect_args.root_cert_path,
+            connect_args.client_cert_path,
+            connect_args.client_private_key,
+        ) {
+            (Some(root_cert_path), None, None) => nats::Options::with_credentials(creds_path)
+                .tls_required(true)
+                .add_root_certificate(root_cert_path)
+                .max_reconnects(30)
+                .reconnect_callback(|| println!("connection has been reestablished"))
+                .reconnect_delay_callback(|reconnect_attempt| {
+                    core::time::Duration::from_millis(std::cmp::min(
+                        (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
+                            as u64,
+                        1000,
+                    ))
+                })
+                .disconnect_callback(|| println!("connection has been lost"))
+                .close_callback(|| println!("connection has been closed")),
             (Some(root_cert_path), Some(client_cert_path), Some(client_private_key)) => {
                 nats::Options::with_credentials(creds_path)
                     .tls_required(true)
@@ -413,18 +421,29 @@ fn nats_connect(connect_args: RunArgs) -> nats::Connection {
                     .client_cert(client_cert_path, client_private_key)
                     .max_reconnects(30)
                     .reconnect_callback(|| println!("connection has been reestablished"))
-                    .reconnect_delay_callback(|reconnect_attempt| core::time::Duration::from_millis(std::cmp::min((reconnect_attempt * rand::Rng::gen_range( &mut rand::thread_rng(), 50..100)) as u64, 1000)))
-                    .disconnect_callback(|| println!("connection has been lost"))
-                    .close_callback(|| println!("connection has been closed"))
-            },
-            _ => {
-                nats::Options::with_credentials(creds_path)
-                    .max_reconnects(30)
-                    .reconnect_callback(|| println!("connection has been reestablished"))
-                    .reconnect_delay_callback(|reconnect_attempt| core::time::Duration::from_millis(std::cmp::min((reconnect_attempt * rand::Rng::gen_range( &mut rand::thread_rng(), 50..100)) as u64, 1000)))
+                    .reconnect_delay_callback(|reconnect_attempt| {
+                        core::time::Duration::from_millis(std::cmp::min(
+                            (reconnect_attempt
+                                * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
+                                as u64,
+                            1000,
+                        ))
+                    })
                     .disconnect_callback(|| println!("connection has been lost"))
                     .close_callback(|| println!("connection has been closed"))
             }
+            _ => nats::Options::with_credentials(creds_path)
+                .max_reconnects(30)
+                .reconnect_callback(|| println!("connection has been reestablished"))
+                .reconnect_delay_callback(|reconnect_attempt| {
+                    core::time::Duration::from_millis(std::cmp::min(
+                        (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
+                            as u64,
+                        1000,
+                    ))
+                })
+                .disconnect_callback(|| println!("connection has been lost"))
+                .close_callback(|| println!("connection has been closed")),
         }
     };
 
@@ -454,10 +473,10 @@ fn main() {
     match opts.subcmd {
         SubCommand::Init(config_args) => {
             near_indexer::indexer_init_configs(&home_dir, config_args.into())
-        },
+        }
         SubCommand::Check(run_args) => {
             nats_connect(run_args.clone());
-        },
+        }
         SubCommand::Run(run_args) => {
             let indexer_config = near_indexer::IndexerConfig {
                 home_dir,

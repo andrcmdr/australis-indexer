@@ -16,9 +16,9 @@ pub(crate) struct Opts {
     /// Custom directory for configurations and state. Defaults to ./.borealis-indexer/
     #[clap(short, long)]
     pub home_dir: Option<std::path::PathBuf>,
-//  /// Configuration file path
-//  #[clap(short, long)]
-//  pub config_path: Option<std::path::PathBuf>,
+    //  /// Configuration file path
+    //  #[clap(short, long)]
+    //  pub config_path: Option<std::path::PathBuf>,
     /// Subcommands
     #[clap(subcommand)]
     pub subcmd: SubCommand,
