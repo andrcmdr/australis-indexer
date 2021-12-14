@@ -2,5 +2,6 @@
 members = [
     "borealis-indexer",
     "borealis-consumer",
+    "borealis-indexer-types",
 ]
 

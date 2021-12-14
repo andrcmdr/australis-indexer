@@ -1,0 +1,25 @@
+[package]
+name = "borealis-indexer-types"
+version = "0.1.0"
+authors = ["Aurora <hello@aurora.dev>"]
+edition = "2021"
+description = "Rust definition of structs sent over the wire by the Borealis Indexer."
+homepage = "https://github.com/aurora-is-near/borealis-indexer"
+repository = "https://github.com/aurora-is-near/borealis-indexer"
+license = "CC0-1.0"
+publish = false
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+serde = { version = "1", features = [ "derive" ] }
+
+[dev-dependencies]
+
+[build-dependencies]
+
+[target]
+
+[features]
+
