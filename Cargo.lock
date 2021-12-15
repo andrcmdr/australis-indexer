@@ -576,6 +576,7 @@ name = "borealis-consumer"
 version = "0.1.0"
 dependencies = [
  "actix",
+ "borealis-indexer-types",
  "clap",
  "nats",
  "near-indexer",
@@ -592,6 +593,7 @@ name = "borealis-indexer"
 version = "0.1.0"
 dependencies = [
  "actix",
+ "borealis-indexer-types",
  "clap",
  "nats",
  "near-indexer",
@@ -608,7 +610,8 @@ dependencies = [
 name = "borealis-indexer-types"
 version = "0.1.0"
 dependencies = [
- "rand 0.7.3",
+ "near-primitives",
+ "rand 0.8.4",
  "serde",
 ]
 

@@ -6,12 +6,13 @@ use nats::jetstream::{
     AckPolicy, Consumer, ConsumerConfig, DeliverPolicy, DiscardPolicy, ReplayPolicy,
     RetentionPolicy, StorageType, StreamConfig,
 };
-use near_indexer::StreamerMessage;
+// use near_indexer::StreamerMessage;
+use borealis_indexer_types::prelude::StreamerMessage;
 use serde_cbor as cbor;
 use serde_json;
 use tracing::info;
 
-mod configs;
+pub mod configs;
 
 fn message_consumer(msg: nats::Message, msg_format: MsgFormat) {
     /*

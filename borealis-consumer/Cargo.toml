@@ -13,6 +13,7 @@ publish = false
 
 [dependencies]
 near-indexer = { git = "https://github.com/near/nearcore", rev = "e72782fe61122049fca63b41fa4e53a21e40bc57" }
+borealis-indexer-types = { path = "../borealis-indexer-types" }
 nats = "0.16.0"
 
 clap = "3.0.0-beta.1"

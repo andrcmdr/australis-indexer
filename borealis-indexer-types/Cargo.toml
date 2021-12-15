@@ -13,8 +13,9 @@ publish = false
 crate-type = ["rlib"]
 
 [dependencies]
-rand = "0.7.3"
+near-primitives = { git = "https://github.com/near/nearcore", rev = "e72782fe61122049fca63b41fa4e53a21e40bc57" }
 serde = { version = "1", features = [ "derive" ] }
+rand = "0.8.4"
 
 [dev-dependencies]
 

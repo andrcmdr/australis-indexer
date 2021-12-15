@@ -8,7 +8,7 @@ use serde_json;
 use tokio::sync::mpsc;
 use tracing::info;
 
-mod configs;
+pub mod configs;
 
 async fn message_producer(
     mut events_stream: mpsc::Receiver<near_indexer::StreamerMessage>,
