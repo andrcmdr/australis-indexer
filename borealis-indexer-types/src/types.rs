@@ -5,29 +5,38 @@ pub use near_primitives::{types, views};
 
 use std::time::SystemTime;
 
-pub const BTC_EPOCH: u64 = 1231006505;
+pub const BTC_EPOCH: u64 = 1231006505; // Bitcoin genesis, 2009-01-03T18:15:05Z
 
 /// Based on https://github.com/aurora-is-near/borealis.go/blob/a17d266a7a4e0918db743db474332e8474e90f35/raw_event.go#L18
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-pub struct RawEvent {
-    pub typ: u16,
+pub struct RawEvent<PayloadType> {
+    pub type_: u16,
     pub sequential_id: u64,
     pub timestamp_s: u32,
     pub timestamp_ms: u16,
     pub unique_id: [u8; 16],
-    pub payload: Vec<u8>, // TODO: actually a map?
+    //  payload can be an object, string or JSON string for further payload serialization and deserialization with the whole RawEvent message to/from CBOR or JSON format with a byte vector representration for a message transmission
+    pub payload: PayloadType,
 }
 
-impl RawEvent {
-    pub fn new(typ: u16, payload: Vec<u8>) -> Self {
+impl<PayloadType> std::ops::Deref for RawEvent<PayloadType> {
+    type Target = PayloadType;
+
+    fn deref(&self) -> &Self::Target {
+        &self.payload
+    }
+}
+
+impl<PayloadType> RawEvent<PayloadType> {
+    pub fn new(type_: u16, sequential_id: u64, payload: PayloadType) -> Self {
         let now = SystemTime::UNIX_EPOCH.elapsed().unwrap();
         let timestamp_s = (now.as_secs() - BTC_EPOCH) as u32;
         let timestamp_ms = (now.as_millis() % 1000) as u16;
         let unique_id = rand::random();
 
         Self {
-            typ,
-            sequential_id: 0,
+            type_,
+            sequential_id,
             timestamp_s,
             timestamp_ms,
             unique_id,
@@ -43,14 +52,14 @@ pub struct StreamerMessage {
     pub state_changes: views::StateChangesView,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct IndexerShard {
     pub shard_id: types::ShardId,
     pub chunk: Option<IndexerChunkView>,
     pub receipt_execution_outcomes: Vec<IndexerExecutionOutcomeWithReceipt>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct IndexerChunkView {
     pub author: types::AccountId,
     pub header: views::ChunkHeaderView,

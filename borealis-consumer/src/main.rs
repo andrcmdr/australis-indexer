@@ -7,7 +7,7 @@ use nats::jetstream::{
     RetentionPolicy, StorageType, StreamConfig,
 };
 // use near_indexer::StreamerMessage;
-use borealis_indexer_types::prelude::StreamerMessage;
+use borealis_indexer_types::prelude::{RawEvent, StreamerMessage};
 use serde_cbor as cbor;
 use serde_json;
 use tracing::info;
@@ -248,8 +248,8 @@ fn message_consumer(msg: nats::Message, msg_format: MsgFormat) {
         }
     */
 
-    // Decoding of StreamerMessage receved from NATS subject
-    let streamer_message: StreamerMessage = match msg_format {
+    // Decoding of RawEvent message receved from NATS subject
+    let raw_event: RawEvent<StreamerMessage> = match msg_format {
         //  MsgFormat::Cbor => cbor::from_slice(msg.to_string().as_bytes())
         MsgFormat::Cbor => cbor::from_slice(msg.data.as_slice())
             .expect("[From CBOR bytes vector] Message decoding error"),
@@ -257,6 +257,8 @@ fn message_consumer(msg: nats::Message, msg_format: MsgFormat) {
         MsgFormat::Json => serde_json::from_slice(msg.data.as_slice())
             .expect("[From JSON bytes vector] Message decoding error"),
     };
+    // Get StreamerMessage from received RawEvent message
+    let streamer_message: StreamerMessage = raw_event.payload;
 
     // Data handling from `StreamerMessage` data structure. For custom filtering purposes.
     // jq '{block_height: .block.header.height, block_hash: .block.header.hash, block_header_chunk: .block.chunks[0], shard_chunk_header: .shards[0].chunk.header, transactions: .shards[0].chunk.transactions, receipts: .shards[0].chunk.receipts, receipt_execution_outcomes: .shards[0].receipt_execution_outcomes, state_changes: .state_changes}'
@@ -455,10 +457,10 @@ fn main() {
 
     match opts.subcmd {
         SubCommand::Check(run_args) => {
-            nats_connect(run_args.clone());
+            nats_connect(run_args);
         }
         SubCommand::Init(run_args) => {
-            let nats_connection = nats_connect(run_args.clone());
+            let nats_connection = nats_connect(run_args);
             nats_connection.create_stream(StreamConfig {
                 name: "BlockIndex".to_string(),
                 discard: DiscardPolicy::Old,
@@ -480,7 +482,7 @@ fn main() {
             }).expect("IO error, something went wrong while creating a new consumer, maybe consumer already exist");
         }
         SubCommand::Run(run_args) => {
-            let nats_connection = nats_connect(run_args.clone());
+            let nats_connection = nats_connect(run_args.to_owned());
             let system = actix::System::new();
             system.block_on(async move {
                 match run_args.work_mode {
@@ -506,14 +508,14 @@ fn main() {
                             ack_policy: AckPolicy::All,
                             filter_subject: "BlockIndex_StreamerMessages".to_string(),
                             replay_policy: ReplayPolicy::Instant,
-                        //  opt_start_seq:,
-                        //  opt_start_time:,
+                        //  opt_start_seq: i64,
+                        //  opt_start_time: Option<DateTime>,
                             ..Default::default()
                         }).expect("IO error, something went wrong while creating a new consumer or returning an existent consumer");
                         loop {
                             let message = consumer.process(|msg| {
                                 println!("Received message:\n{}", msg);
-                                Ok(msg.clone())
+                                Ok(msg.to_owned())
                             }).expect("IO error, something went wrong while receiving a new message");
                             message_consumer(message, run_args.msg_format);
                         };

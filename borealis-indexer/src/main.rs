@@ -1,4 +1,5 @@
 use actix;
+use borealis_indexer_types::prelude::RawEvent;
 use clap::Clap;
 use configs::{init_logging, MsgFormat, Opts, RunArgs, SubCommand};
 use nats;
@@ -255,14 +256,24 @@ async fn message_producer(
             MsgFormat::Cbor => {
                 nc.publish(
                     format!("{}_{:?}", subject, msg_format).as_str(),
-                    cbor::to_vec(&streamer_message).unwrap(),
+                    cbor::to_vec(&RawEvent::new(
+                        0,
+                        streamer_message.block.header.height,
+                        &streamer_message,
+                    ))
+                    .unwrap(),
                 )
                 .expect("[CBOR bytes vector] Message passing error");
             }
             MsgFormat::Json => {
                 nc.publish(
                     format!("{}_{:?}", subject, msg_format).as_str(),
-                    serde_json::to_vec(&streamer_message).unwrap(),
+                    serde_json::to_vec(&RawEvent::new(
+                        0,
+                        streamer_message.block.header.height,
+                        &streamer_message,
+                    ))
+                    .unwrap(),
                 )
                 .expect("[JSON bytes vector] Message passing error");
             }
@@ -475,7 +486,7 @@ fn main() {
             near_indexer::indexer_init_configs(&home_dir, config_args.into())
         }
         SubCommand::Check(run_args) => {
-            nats_connect(run_args.clone());
+            nats_connect(run_args);
         }
         SubCommand::Run(run_args) => {
             let indexer_config = near_indexer::IndexerConfig {
@@ -487,7 +498,7 @@ fn main() {
                 await_for_node_synced: near_indexer::AwaitForNodeSyncedEnum::StreamWhileSyncing,
             };
 
-            let nats_connection = nats_connect(run_args.clone());
+            let nats_connection = nats_connect(run_args.to_owned());
 
             let system = actix::System::new();
             system.block_on(async move {
