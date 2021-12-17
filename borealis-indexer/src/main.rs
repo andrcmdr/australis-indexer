@@ -482,11 +482,11 @@ fn main() {
         .unwrap_or(std::path::PathBuf::from("./.borealis-indexer"));
 
     match opts.subcmd {
-        SubCommand::Init(config_args) => {
-            near_indexer::indexer_init_configs(&home_dir, config_args.into())
-        }
         SubCommand::Check(run_args) => {
             nats_connect(run_args);
+        }
+        SubCommand::Init(config_args) => {
+            near_indexer::indexer_init_configs(&home_dir, config_args.into())
         }
         SubCommand::Run(run_args) => {
             let indexer_config = near_indexer::IndexerConfig {

@@ -54,15 +54,15 @@ elif [[ "$1" == "genconf" || "$1" == "init" ]]; then
         echo "Canceled"
     fi
 
-elif [[ "$1" == "run" ]]; then
+elif [[ "$1" == "exec" ]]; then
 
-    read -n 1 -s -p "Proceed with indexer run? [Enter/y|n] : " choice_run
+    read -n 1 -s -p "Proceed with indexer command pasing? [Enter/y|n] : " choice_exec
     echo -e "\n"
 
-    if [[ $choice_run == "y" || $choice_run == "" ]]; then
+    if [[ $choice_exec == "y" || $choice_exec == "" ]]; then
 
-        ./target/debug/borealis-indexer run "${@:2}"
-        # ./target/release/borealis-indexer run "${@:2}"
+        ./target/debug/borealis-indexer "${@:2}"
+        # ./target/release/borealis-indexer "${@:2}"
         # | jq '{block_height: .block.header.height, block_hash: .block.header.hash, block_header_chunks: .block.chunks, shard_chunk_header: .shards[0].chunk.header, transactions: .shards[0].chunk.transactions, receipts: .shards[0].chunk.receipts, receipt_execution_outcomes: .shards[0].receipt_execution_outcomes, state_changes: .state_changes}'
 
     else

@@ -27,10 +27,10 @@ pub(crate) struct Opts {
 /// CLI subcommands
 #[derive(Clap, Debug, Clone)]
 pub(crate) enum SubCommand {
-    /// Initialize Borealis Indexer configuration
-    Init(InitConfigArgs),
     /// Checking connection to NATS
     Check(RunArgs),
+    /// Initialize Borealis Indexer configuration
+    Init(InitConfigArgs),
     /// Run Borealis Indexer with options and sync blocks from the network
     Run(RunArgs),
 }
