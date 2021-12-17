@@ -487,18 +487,24 @@ fn main() {
             system.block_on(async move {
                 match run_args.work_mode {
                     WorkMode::Subscriber => {
-                        nats_connection
+                        let subscription = nats_connection
                             .subscribe(
                                 format!("{}_{:?}", run_args.subject, run_args.msg_format).as_str(),
                             )
                             .expect(
                                 "Subscription error: maybe wrong or nonexistent `--subject` name",
-                            )
-                            .with_handler(move |msg| {
-                                println!("Received message:\n{}", &msg);
-                                message_consumer(msg, run_args.msg_format);
-                                Ok(())
-                            });
+                            );
+                            loop {
+                                if let Ok(msg) = subscription.next_timeout(std::time::Duration::from_millis(10000)) {
+                                    println!("Received message:\n{}", &msg);
+                                    message_consumer(msg, run_args.msg_format);
+                                } else {
+                                    info!(
+                                        target: "borealis_consumer",
+                                        "Message wasn't received within 10s timeframe: Error occured due to waiting timeout for message receiving was elapsed\n"
+                                    );
+                                };
+                            };
                     }
                     WorkMode::Jetstream => {
                         let mut consumer = Consumer::create_or_open(nats_connection, "BlockIndex", ConsumerConfig {
