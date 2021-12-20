@@ -105,7 +105,7 @@ impl FromStr for MsgFormat {
 pub(crate) fn init_logging() {
     // Custom filters
     let env_filter = EnvFilter::new(
-        "borealis-indexer=info,tokio_reactor=info,near=info,near=error,stats=info,telemetry=info,borealis_indexer=info,indexer=info,near-performance-metrics=info",
+        "borealis-consumer=info,tokio_reactor=info,near=info,near=error,stats=info,telemetry=info,borealis_consumer=info,indexer=info,near-performance-metrics=info",
     );
     tracing_subscriber::fmt::Subscriber::builder()
         .with_env_filter(env_filter)
