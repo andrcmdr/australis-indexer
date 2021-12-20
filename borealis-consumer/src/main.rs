@@ -385,26 +385,28 @@ fn nats_connect(connect_args: RunArgs) -> nats::Connection {
         .creds_path
         .unwrap_or(std::path::PathBuf::from("./.nats/seed/nats.creds"));
 
-    let options = {
+    let options =
         match (
             connect_args.root_cert_path,
             connect_args.client_cert_path,
             connect_args.client_private_key,
         ) {
-            (Some(root_cert_path), None, None) => nats::Options::with_credentials(creds_path)
-                .tls_required(true)
-                .add_root_certificate(root_cert_path)
-                .max_reconnects(30)
-                .reconnect_callback(|| println!("connection has been reestablished"))
-                .reconnect_delay_callback(|reconnect_attempt| {
-                    core::time::Duration::from_millis(std::cmp::min(
-                        (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
-                            as u64,
-                        1000,
-                    ))
-                })
-                .disconnect_callback(|| println!("connection has been lost"))
-                .close_callback(|| println!("connection has been closed")),
+            (Some(root_cert_path), None, None) => {
+                nats::Options::with_credentials(creds_path)
+                    .tls_required(true)
+                    .add_root_certificate(root_cert_path)
+                    .max_reconnects(30)
+                    .reconnect_callback(|| println!("connection has been reestablished"))
+                    .reconnect_delay_callback(|reconnect_attempt| {
+                        core::time::Duration::from_millis(std::cmp::min(
+                            (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
+                                as u64,
+                            1000,
+                        ))
+                    })
+                    .disconnect_callback(|| println!("connection has been lost"))
+                    .close_callback(|| println!("connection has been closed"))
+            },
             (Some(root_cert_path), Some(client_cert_path), Some(client_private_key)) => {
                 nats::Options::with_credentials(creds_path)
                     .tls_required(true)
@@ -414,29 +416,29 @@ fn nats_connect(connect_args: RunArgs) -> nats::Connection {
                     .reconnect_callback(|| println!("connection has been reestablished"))
                     .reconnect_delay_callback(|reconnect_attempt| {
                         core::time::Duration::from_millis(std::cmp::min(
-                            (reconnect_attempt
-                                * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
+                            (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
                                 as u64,
                             1000,
                         ))
                     })
                     .disconnect_callback(|| println!("connection has been lost"))
                     .close_callback(|| println!("connection has been closed"))
-            }
-            _ => nats::Options::with_credentials(creds_path)
-                .max_reconnects(30)
-                .reconnect_callback(|| println!("connection has been reestablished"))
-                .reconnect_delay_callback(|reconnect_attempt| {
-                    core::time::Duration::from_millis(std::cmp::min(
-                        (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
-                            as u64,
-                        1000,
-                    ))
-                })
-                .disconnect_callback(|| println!("connection has been lost"))
-                .close_callback(|| println!("connection has been closed")),
-        }
-    };
+            },
+            _ => {
+                nats::Options::with_credentials(creds_path)
+                    .max_reconnects(30)
+                    .reconnect_callback(|| println!("connection has been reestablished"))
+                    .reconnect_delay_callback(|reconnect_attempt| {
+                        core::time::Duration::from_millis(std::cmp::min(
+                            (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
+                                as u64,
+                            1000,
+                        ))
+                    })
+                    .disconnect_callback(|| println!("connection has been lost"))
+                    .close_callback(|| println!("connection has been closed"))
+            },
+        };
 
     let nats_connection = options
         .connect(&connect_args.nats_server)
@@ -460,21 +462,21 @@ fn main() {
             nats_connect(run_args);
         }
         SubCommand::Init(run_args) => {
-            let nats_connection = nats_connect(run_args);
+            let nats_connection = nats_connect(run_args.to_owned());
             nats_connection.create_stream(StreamConfig {
                 name: "BlockIndex".to_string(),
                 discard: DiscardPolicy::Old,
-                subjects: Some(vec!["BlockIndex_StreamerMessages".to_string()]),
+                subjects: Some(vec![format!("{}_{:?}", run_args.subject, run_args.msg_format)]),
                 retention: RetentionPolicy::Limits,
                 storage: StorageType::File,
                 ..Default::default()
             }).expect("IO error, something went wrong while creating a new stream, maybe stream already exist");
             nats_connection.create_consumer("BlockIndex", ConsumerConfig {
-                deliver_subject: Some("BlockIndex_StreamerMessages".to_string()),
-                durable_name: Some("Borealis_Consumer_BlockIndex_StreamerMessages".to_string()),
+                deliver_subject: Some(format!("{}_{:?}", run_args.subject, run_args.msg_format)),
+                durable_name: Some(format!("Borealis_Consumer_{}_{:?}", run_args.subject, run_args.msg_format)),
                 deliver_policy: DeliverPolicy::Last,
                 ack_policy: AckPolicy::All,
-                filter_subject: "BlockIndex_StreamerMessages".to_string(),
+                filter_subject: format!("{}_{:?}", run_args.subject, run_args.msg_format),
                 replay_policy: ReplayPolicy::Instant,
             //  opt_start_seq:,
             //  opt_start_time:,
@@ -494,25 +496,25 @@ fn main() {
                             .expect(
                                 "Subscription error: maybe wrong or nonexistent `--subject` name",
                             );
-                            loop {
-                                if let Ok(msg) = subscription.next_timeout(std::time::Duration::from_millis(10000)) {
-                                    println!("Received message:\n{}", &msg);
-                                    message_consumer(msg, run_args.msg_format);
-                                } else {
-                                    info!(
-                                        target: "borealis_consumer",
-                                        "Message wasn't received within 10s timeframe: Error occured due to waiting timeout for message receiving was elapsed\n"
-                                    );
-                                };
+                        loop {
+                            if let Ok(msg) = subscription.next_timeout(std::time::Duration::from_millis(10000)) {
+                                println!("Received message:\n{}", &msg);
+                                message_consumer(msg, run_args.msg_format);
+                            } else {
+                                info!(
+                                    target: "borealis_consumer",
+                                    "Message wasn't received within 10s timeframe: Error occured due to waiting timeout for message receiving was elapsed\n"
+                                );
                             };
-                    }
+                        };
+                    },
                     WorkMode::Jetstream => {
                         let mut consumer = Consumer::create_or_open(nats_connection, "BlockIndex", ConsumerConfig {
-                            deliver_subject: Some("BlockIndex_StreamerMessages".to_string()),
-                            durable_name: Some("Borealis_Consumer_BlockIndex_StreamerMessages".to_string()),
+                            deliver_subject: Some(format!("{}_{:?}", run_args.subject, run_args.msg_format)),
+                            durable_name: Some(format!("Borealis_Consumer_{}_{:?}", run_args.subject, run_args.msg_format)),
                             deliver_policy: DeliverPolicy::Last,
                             ack_policy: AckPolicy::All,
-                            filter_subject: "BlockIndex_StreamerMessages".to_string(),
+                            filter_subject: format!("{}_{:?}", run_args.subject, run_args.msg_format),
                             replay_policy: ReplayPolicy::Instant,
                         //  opt_start_seq: i64,
                         //  opt_start_time: Option<DateTime>,
@@ -525,7 +527,7 @@ fn main() {
                             }).expect("IO error, something went wrong while receiving a new message");
                             message_consumer(message, run_args.msg_format);
                         };
-                    }
+                    },
                 }
             });
             system.run().unwrap();

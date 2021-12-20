@@ -125,18 +125,6 @@ pub(crate) struct InitConfigArgs {
     pub max_gas_burnt_view: Option<Gas>,
 }
 
-/// Initialize logging
-pub(crate) fn init_logging() {
-    // Custom filters
-    let env_filter = EnvFilter::new(
-        "borealis-indexer=info,tokio_reactor=info,near=info,near=error,stats=info,telemetry=info,borealis_indexer=info,indexer=info,near-performance-metrics=info",
-    );
-    tracing_subscriber::fmt::Subscriber::builder()
-        .with_env_filter(env_filter)
-        .with_writer(std::io::stderr)
-        .init();
-}
-
 /// Override standard config args with CLI options
 impl From<InitConfigArgs> for near_indexer::InitConfigArgs {
     fn from(config_args: InitConfigArgs) -> Self {
@@ -155,4 +143,16 @@ impl From<InitConfigArgs> for near_indexer::InitConfigArgs {
             max_gas_burnt_view: config_args.max_gas_burnt_view,
         }
     }
+}
+
+/// Initialize logging
+pub(crate) fn init_logging() {
+    // Custom filters
+    let env_filter = EnvFilter::new(
+        "borealis-indexer=info,tokio_reactor=info,near=info,near=error,stats=info,telemetry=info,borealis_indexer=info,indexer=info,near-performance-metrics=info",
+    );
+    tracing_subscriber::fmt::Subscriber::builder()
+        .with_env_filter(env_filter)
+        .with_writer(std::io::stderr)
+        .init();
 }
