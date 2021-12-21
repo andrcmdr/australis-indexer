@@ -28,11 +28,8 @@ if [ ! -f /near/${network}/validator_key.json ]; then
 	/usr/local/bin/nearkey "validator%.${namePostfix}" > /near/${network}/validator_key.json
 fi
 
-if [ ! -f /near/server ]; then
-	echo "nats://westcoast.nats.backend.aurora.dev:4222" > /near/server
-fi
 if [ ! -f /near/subject ]; then
-	echo "BlockIndex_StreamerMessages" > /near/subject
+	echo "BlockIndex_StreamerMessages_${network}" > /near/subject
 fi
 
 /usr/local/bin/borealis-indexer --home-dir /near/${network} run --creds-path "/near/nats.creds" --nats-server "$(cat /near/server)" --subject "$(cat /near/subject)" --msg-format CBOR
