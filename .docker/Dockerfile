@@ -78,3 +78,6 @@ VOLUME /home/near
 ENTRYPOINT [ "/usr/local/bin/startnode.sh" ]
 
 # docker build -t nearaurora/nearindex:testnet --build-arg NEARNETWORK=testnet -f Dockerfile .
+# docker run --rm -v /absolutepath/near:/near nearaurora/nearindex:testnet
+# Make sure to have /absolutepath/near/creds.nat set to the credentials file.
+# Make sure that /abosultepath/near/server contains the server address to connect to.
