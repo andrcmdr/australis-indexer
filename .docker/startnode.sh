@@ -13,11 +13,11 @@ if [ ! -d /near/${network} ]; then
 fi
 
 if [ ! -f /near/${network}/config.json ]; then
-	curl -o /near/${network}/config.json https://s3-us-west-1.amazonaws.com/build.nearprotocol.com/nearcore-deploy/testnet/config.json
+	curl -o /near/${network}/config.json https://s3-us-west-1.amazonaws.com/build.nearprotocol.com/nearcore-deploy/${network}/config.json
 fi
 
 if [ ! -f /near/${network}/genesis.json ]; then
-	curl -o /near/${network}/genesis.json https://s3-us-west-1.amazonaws.com/build.nearprotocol.com/nearcore-deploy/testnet/genesis.json
+	curl -o /near/${network}/genesis.json https://s3-us-west-1.amazonaws.com/build.nearprotocol.com/nearcore-deploy/${network}/genesis.json
 fi
 
 if [ ! -f /near/${network}/node_key.json ]; then
