@@ -17,6 +17,10 @@ async fn message_producer(
     subject: String,
     msg_format: MsgFormat,
 ) {
+    info!(
+        target: "borealis_indexer",
+        "Going into message producer loop\n"
+    );
     while let Some(streamer_message) = events_stream.recv().await {
         /*
             Example of `StreamerMessage` with all data fields (filled with synthetic data, as an example):
@@ -250,6 +254,11 @@ async fn message_producer(
                 ],
             }
         */
+
+        info!(
+            target: "borealis_indexer",
+            "In message producer loop\n"
+        );
 
         // Stream message to NATS
         match msg_format {
@@ -486,6 +495,10 @@ fn main() {
     match opts.subcmd {
         SubCommand::Check(run_args) => {
             nats_connect(run_args);
+            info!(
+                target: "borealis_indexer",
+                "Connection checked\n"
+            );
         }
         SubCommand::Init(config_args) => {
             near_indexer::indexer_init_configs(&home_dir, config_args.into());
@@ -493,6 +506,8 @@ fn main() {
         SubCommand::Run(run_args) => {
             let indexer_config = near_indexer::IndexerConfig {
                 home_dir,
+                // sync_mode: near_indexer::SyncModeEnum::LatestSynced,
+                // sync_mode: near_indexer::SyncModeEnum::BlockHeight(56180000),
                 // recover and continue message streaming from latest syncing block
                 sync_mode: near_indexer::SyncModeEnum::FromInterruption,
                 // await_for_node_synced: near_indexer::AwaitForNodeSyncedEnum::WaitForFullSync,

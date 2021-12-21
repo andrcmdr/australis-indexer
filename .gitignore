@@ -6,6 +6,9 @@ target/
 
 # Borealis Indexer State
 .borealis-indexer/data/
+data/
+*/testnet/genesis.json
+*/testnet*/genesis.json
 
 # Visual Studio Code
 .vscode/

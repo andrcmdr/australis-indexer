@@ -19,14 +19,6 @@ pub struct RawEvent<PayloadType> {
     pub payload: PayloadType,
 }
 
-impl<PayloadType> std::ops::Deref for RawEvent<PayloadType> {
-    type Target = PayloadType;
-
-    fn deref(&self) -> &Self::Target {
-        &self.payload
-    }
-}
-
 impl<PayloadType> RawEvent<PayloadType> {
     pub fn new(type_: u16, sequential_id: u64, payload: PayloadType) -> Self {
         let now = SystemTime::UNIX_EPOCH.elapsed().unwrap();

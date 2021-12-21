@@ -1,16 +1,14 @@
 #!/bin/sh
 
 network="testnet"
-namePostfix="test"
 
 if $(is-mainnet); then
-	network="mainnet"
-	namePostfix="near"
+    network="mainnet"
 fi
 
-if [ ! -d /near/${network} ]; then
-	mkdir /near/${network}
-	/usr/local/bin/borealis-indexer --home-dir /near/${network} init --chain-id ${network} --boot-nodes "" --download-genesis --download-genesis-url "" --download-config --download-config-url "https://s3-us-west-1.amazonaws.com/build.nearprotocol.com/nearcore-deploy/${network}/config.json"
+if [ ! -d /borealis-indexer/${network} ]; then
+    mkdir /borealis-indexer/${network}
+    /usr/local/bin/borealis-indexer --home-dir /borealis-indexer/${network} init --chain-id ${network} --download-genesis --download-config
 fi
 
-/usr/local/bin/borealis-indexer --home-dir /near/testnet run --creds-path "/near/testnet/nats.creds" --nats-server nats://westcoast.nats.backend.aurora.dev:4222 --subject "BlockIndex_StreamerMessages" --msg-format JSON
+/usr/local/bin/borealis-indexer --home-dir /borealis-indexer/${network} run --root-cert-path /borealis-indexer/${network}/root-ca.crt --creds-path /borealis-indexer/${network}/nats.creds --nats-server "tls://westcoast.nats.backend.aurora.dev:4222,tls://eastcoast.nats.backend.aurora.dev:4222" --subject "BlockIndex_StreamerMessages_${network}" --msg-format "CBOR"

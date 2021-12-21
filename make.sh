@@ -39,7 +39,7 @@ elif [[ "$1" == "build" ]]; then
 
 elif [[ "$1" == "genconf" || "$1" == "init" ]]; then
 
-    read -n 1 -s -p "Proceed with indexer initial configuration for partcular network (enter as `init localnet/devnet/testnet/betanet/mainnet`)? [Enter/y|n] : " choice_init
+    read -n 1 -s -p "Proceed with indexer initial configuration for particular network (enter as `init localnet/devnet/testnet/betanet/mainnet`)? [Enter/y|n] : " choice_init
     echo -e "\n"
 
     if [[ $choice_init == "y" || $choice_init == "" ]]; then
@@ -56,7 +56,9 @@ elif [[ "$1" == "genconf" || "$1" == "init" ]]; then
             ./target/debug/borealis-indexer --home-dir ./.borealis-indexer/ init "${@:2}"
             # ./target/release/borealis-indexer --home-dir ./.borealis-indexer/ init "${@:2}"
 
-            sed -r -s -i"" "s/^(\s*?)\"tracked\_shards\"\:\s\[\]\,/\1\"tracked\_shards\"\:\ \[0\]\,/gI" ./.borealis-indexer/config.json
+            sed -r -s -i"" "s/^(\s*?)\"tracked\_shards\"\:\s\[\]\,/\1\"tracked\_shards\"\:\ \[0\]\,/gI" "./.borealis-indexer/${2}/config.json"
+
+        fi
 
     else
         echo

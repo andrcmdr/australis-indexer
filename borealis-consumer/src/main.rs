@@ -248,6 +248,11 @@ fn message_consumer(msg: nats::Message, msg_format: MsgFormat) {
         }
     */
 
+    info!(
+        target: "borealis_consumer",
+        "In message consumer loop\n"
+    );
+
     // Decoding of RawEvent message receved from NATS subject
     let raw_event: RawEvent<StreamerMessage> = match msg_format {
         //  MsgFormat::Cbor => cbor::from_slice(msg.to_string().as_bytes())
@@ -460,6 +465,10 @@ fn main() {
     match opts.subcmd {
         SubCommand::Check(run_args) => {
             nats_connect(run_args);
+            info!(
+                target: "borealis_consumer",
+                "Connection checked\n"
+            );
         }
         SubCommand::Init(run_args) => {
             let nats_connection = nats_connect(run_args.to_owned());
@@ -482,6 +491,10 @@ fn main() {
             //  opt_start_time:,
                 ..Default::default()
             }).expect("IO error, something went wrong while creating a new consumer, maybe consumer already exist");
+            info!(
+                target: "borealis_consumer",
+                "Initialized\n"
+            );
         }
         SubCommand::Run(run_args) => {
             let nats_connection = nats_connect(run_args.to_owned());
