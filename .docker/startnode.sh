@@ -1,35 +1,14 @@
 #!/bin/sh
 
 network="testnet"
-namePostfix="test"
 
 if $(is-mainnet); then
-	network="mainnet"
-	namePostfix="near"
+    network="mainnet"
 fi
 
-if [ ! -d /near/${network} ]; then
-	mkdir /near/${network}
+if [ ! -d /borealis-indexer/${network} ]; then
+    mkdir /borealis-indexer/${network}
+    /usr/local/bin/borealis-indexer --home-dir /borealis-indexer/${network} init --chain-id ${network} --download-genesis --download-config
 fi
 
-if [ ! -f /near/${network}/config.json ]; then
-	curl -o /near/${network}/config.json https://s3-us-west-1.amazonaws.com/build.nearprotocol.com/nearcore-deploy/${network}/config.json
-fi
-
-if [ ! -f /near/${network}/genesis.json ]; then
-	curl -o /near/${network}/genesis.json https://s3-us-west-1.amazonaws.com/build.nearprotocol.com/nearcore-deploy/${network}/genesis.json
-fi
-
-if [ ! -f /near/${network}/node_key.json ]; then
-	/usr/local/bin/nearkey "node%.${namePostfix}" > /near/${network}/node_key.json
-fi
-
-if [ ! -f /near/${network}/validator_key.json ]; then
-	/usr/local/bin/nearkey "validator%.${namePostfix}" > /near/${network}/validator_key.json
-fi
-
-if [ ! -f /near/subject ]; then
-	echo "BlockIndex_StreamerMessages_${network}" > /near/subject
-fi
-
-/usr/local/bin/borealis-indexer --home-dir /near/${network} run --creds-path "/near/nats.creds" --nats-server "$(cat /near/server)" --subject "$(cat /near/subject)" --msg-format CBOR
+/usr/local/bin/borealis-indexer --home-dir /borealis-indexer/${network} run --root-cert-path /borealis-indexer/${network}/root-ca.crt --creds-path /borealis-indexer/${network}/nats.creds --nats-server "tls://westcoast.nats.backend.aurora.dev:4222,tls://eastcoast.nats.backend.aurora.dev:4222" --subject "BlockIndex_StreamerMessages_${network}" --msg-format "CBOR"
