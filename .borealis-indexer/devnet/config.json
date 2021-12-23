@@ -30,7 +30,7 @@
     "addr": "0.0.0.0:24567",
     "external_address": "",
     "boot_nodes": "",
-    "max_num_peers": 40,
+    "max_num_peers": 128,
     "minimum_outbound_peers": 5,
     "ideal_connections_lo": 30,
     "ideal_connections_hi": 35,

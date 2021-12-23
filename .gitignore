@@ -7,8 +7,11 @@ target/
 # Borealis Indexer State
 .borealis-indexer/data/
 data/
+*/data.tar
 */testnet/genesis.json
 */testnet*/genesis.json
+*/betanet/genesis.json
+*/betanet*/genesis.json
 
 # Visual Studio Code
 .vscode/

@@ -1,0 +1,7 @@
+https://s3-us-west-1.amazonaws.com/build.nearprotocol.com/nearcore-deploy/testnet/config.json
+
+https://s3-us-west-1.amazonaws.com/build.nearprotocol.com/nearcore-deploy/testnet/genesis.json
+
+https://near-protocol-public.s3.ca-central-1.amazonaws.com/backups/testnet/rpc/data.tar
+
+# https://near-protocol-public.s3.ca-central-1.amazonaws.com/backups/testnet/archive/data.tar
