@@ -5,12 +5,18 @@ pub use near_primitives::{types, views};
 
 use std::time::SystemTime;
 
-pub const BTC_EPOCH: u64 = 1231006505; // Bitcoin genesis, 2009-01-03T18:15:05Z
+pub const VERSION: u8 = 1;
+pub const EVENT_TYPE: u16 = 4096;
+pub const BOREALIS_EPOCH: u64 = 1231006505; // Conform to Bitcoin genesis, 2009-01-03T18:15:05Z
 
-/// Based on https://github.com/aurora-is-near/borealis.go/blob/a17d266a7a4e0918db743db474332e8474e90f35/raw_event.go#L18
+/// According to:
+/// https://github.com/aurora-is-near/borealis.go/blob/a17d266a7a4e0918db743db474332e8474e90f35/raw_event.go#L18-L26
+/// https://github.com/aurora-is-near/borealis.go/blob/a17d266a7a4e0918db743db474332e8474e90f35/events.go#L14-L19
+/// https://github.com/aurora-is-near/borealis-events#message-format
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct RawEvent<PayloadType> {
-    pub type_: u16,
+    pub version: u8,
+    pub event_type: u16,
     pub sequential_id: u64,
     pub timestamp_s: u32,
     pub timestamp_ms: u16,
@@ -20,14 +26,17 @@ pub struct RawEvent<PayloadType> {
 }
 
 impl<PayloadType> RawEvent<PayloadType> {
-    pub fn new(type_: u16, sequential_id: u64, payload: PayloadType) -> Self {
+    pub fn new(sequential_id: u64, payload: PayloadType) -> Self {
+        let version = VERSION;
+        let event_type = EVENT_TYPE;
         let now = SystemTime::UNIX_EPOCH.elapsed().unwrap();
-        let timestamp_s = (now.as_secs() - BTC_EPOCH) as u32;
+        let timestamp_s = (now.as_secs() - BOREALIS_EPOCH) as u32;
         let timestamp_ms = (now.as_millis() % 1000) as u16;
         let unique_id = rand::random();
 
         Self {
-            type_,
+            version,
+            event_type,
             sequential_id,
             timestamp_s,
             timestamp_ms,
