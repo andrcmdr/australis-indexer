@@ -19,7 +19,7 @@ async fn message_producer(
 ) {
     info!(
         target: "borealis_indexer",
-        "Going into message producer loop\n"
+        "Message producer loop started: listening for new messages\n"
     );
     while let Some(streamer_message) = events_stream.recv().await {
         /*
@@ -257,7 +257,7 @@ async fn message_producer(
 
         info!(
             target: "borealis_indexer",
-            "In message producer loop\n"
+            "Message producer loop executed: message received\n"
         );
 
         // Stream message to NATS
@@ -266,7 +266,6 @@ async fn message_producer(
                 nc.publish(
                     format!("{}_{:?}", subject, msg_format).as_str(),
                     cbor::to_vec(&RawEvent::new(
-                        0,
                         streamer_message.block.header.height,
                         &streamer_message,
                     ))
@@ -278,7 +277,6 @@ async fn message_producer(
                 nc.publish(
                     format!("{}_{:?}", subject, msg_format).as_str(),
                     serde_json::to_vec(&RawEvent::new(
-                        0,
                         streamer_message.block.header.height,
                         &streamer_message,
                     ))
@@ -422,50 +420,62 @@ fn nats_connect(connect_args: RunArgs) -> nats::Connection {
         ) {
             (Some(root_cert_path), None, None) => {
                 nats::Options::with_credentials(creds_path)
+                    .with_name("Borealis Indexer [TLS]")
                     .tls_required(true)
                     .add_root_certificate(root_cert_path)
-                    .max_reconnects(30)
+                    .reconnect_buffer_size(1024 * 1024 * 1024)
+                    .max_reconnects(1000)
                     .reconnect_callback(|| println!("connection has been reestablished"))
                     .reconnect_delay_callback(|reconnect_attempt| {
-                        core::time::Duration::from_millis(std::cmp::min(
+                        let delay = core::time::Duration::from_millis(std::cmp::min(
                             (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
                                 as u64,
                             1000,
-                        ))
+                        ));
+                        println!("reconnection attempt #{} within delay of {:?} ms...", reconnect_attempt, delay);
+                        delay
                     })
-                    .disconnect_callback(|| println!("connection has been lost"))
-                    .close_callback(|| println!("connection has been closed"))
+                    .disconnect_callback(|| println!("connection has been lost")) // todo: re-run message producer
+                    .close_callback(|| println!("connection has been closed")) // todo: re-run message producer
             },
             (Some(root_cert_path), Some(client_cert_path), Some(client_private_key)) => {
                 nats::Options::with_credentials(creds_path)
+                    .with_name("Borealis Indexer [TLS, Client Auth]")
                     .tls_required(true)
                     .add_root_certificate(root_cert_path)
                     .client_cert(client_cert_path, client_private_key)
-                    .max_reconnects(30)
+                    .reconnect_buffer_size(1024 * 1024 * 1024)
+                    .max_reconnects(1000)
                     .reconnect_callback(|| println!("connection has been reestablished"))
                     .reconnect_delay_callback(|reconnect_attempt| {
-                        core::time::Duration::from_millis(std::cmp::min(
+                        let delay = core::time::Duration::from_millis(std::cmp::min(
                             (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
                                 as u64,
                             1000,
-                        ))
+                        ));
+                        println!("reconnection attempt #{} within delay of {:?} ms...", reconnect_attempt, delay);
+                        delay
                     })
-                    .disconnect_callback(|| println!("connection has been lost"))
-                    .close_callback(|| println!("connection has been closed"))
+                    .disconnect_callback(|| println!("connection has been lost")) // todo: re-run message producer
+                    .close_callback(|| println!("connection has been closed")) // todo: re-run message producer
             },
             _ => {
                 nats::Options::with_credentials(creds_path)
-                    .max_reconnects(30)
+                    .with_name("Borealis Indexer [NATS, w/o TLS]")
+                    .reconnect_buffer_size(1024 * 1024 * 1024)
+                    .max_reconnects(1000)
                     .reconnect_callback(|| println!("connection has been reestablished"))
                     .reconnect_delay_callback(|reconnect_attempt| {
-                        core::time::Duration::from_millis(std::cmp::min(
+                        let delay = core::time::Duration::from_millis(std::cmp::min(
                             (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
                                 as u64,
                             1000,
-                        ))
+                        ));
+                        println!("reconnection attempt #{} within delay of {:?} ms...", reconnect_attempt, delay);
+                        delay
                     })
-                    .disconnect_callback(|| println!("connection has been lost"))
-                    .close_callback(|| println!("connection has been closed"))
+                    .disconnect_callback(|| println!("connection has been lost")) // todo: re-run message producer
+                    .close_callback(|| println!("connection has been closed")) // todo: re-run message producer
             },
         };
 
@@ -494,10 +504,11 @@ fn main() {
 
     match opts.subcmd {
         SubCommand::Check(run_args) => {
-            nats_connect(run_args);
+            let nats_connection = nats_connect(run_args);
             info!(
                 target: "borealis_indexer",
-                "Connection checked\n"
+                "Checked:\nConnection:\n{:?}",
+                nats_connection
             );
         }
         SubCommand::Init(config_args) => {

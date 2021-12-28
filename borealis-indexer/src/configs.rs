@@ -57,7 +57,7 @@ pub(crate) struct RunArgs {
     /// Stream messages to subject
     #[clap(long, default_value = "BlockIndex_StreamerMessages")]
     pub subject: String,
-    /// Streaming messages format (`CBOR` or `JSON`)
+    /// Streaming messages format (`CBOR` or `JSON`), suffix for subject name
     #[clap(long, default_value = "CBOR")]
     pub msg_format: MsgFormat,
 }
@@ -87,7 +87,7 @@ impl FromStr for MsgFormat {
 /// Override standard config args with CLI options
 #[derive(Clap, Debug, Clone)]
 pub(crate) struct InitConfigArgs {
-    /// chain/network id (localnet, testnet, devnet, betanet)
+    /// chain/network id (localnet, devnet, testnet, betanet, mainnet)
     #[clap(short, long)]
     pub chain_id: Option<String>,
     /// Account ID for the validator key
