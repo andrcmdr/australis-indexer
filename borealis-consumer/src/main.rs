@@ -250,7 +250,7 @@ fn message_consumer(msg: nats::Message, msg_format: MsgFormat) {
 
     info!(
         target: "borealis_consumer",
-        "In message consumer loop\n"
+        "Message consumer loop executed: message received\n"
     );
 
     // Decoding of RawEvent message receved from NATS subject
@@ -398,50 +398,62 @@ fn nats_connect(connect_args: RunArgs) -> nats::Connection {
         ) {
             (Some(root_cert_path), None, None) => {
                 nats::Options::with_credentials(creds_path)
+                    .with_name("Borealis Indexer [TLS]")
                     .tls_required(true)
                     .add_root_certificate(root_cert_path)
-                    .max_reconnects(30)
+                    .reconnect_buffer_size(1024 * 1024 * 1024)
+                    .max_reconnects(1000)
                     .reconnect_callback(|| println!("connection has been reestablished"))
                     .reconnect_delay_callback(|reconnect_attempt| {
-                        core::time::Duration::from_millis(std::cmp::min(
+                        let delay = core::time::Duration::from_millis(std::cmp::min(
                             (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
                                 as u64,
                             1000,
-                        ))
+                        ));
+                        println!("reconnection attempt #{} within delay of {:?} ms...", reconnect_attempt, delay);
+                        delay
                     })
-                    .disconnect_callback(|| println!("connection has been lost"))
-                    .close_callback(|| println!("connection has been closed"))
+                    .disconnect_callback(|| println!("connection has been lost")) // todo: re-run message consumer
+                    .close_callback(|| println!("connection has been closed")) // todo: re-run message consumer
             },
             (Some(root_cert_path), Some(client_cert_path), Some(client_private_key)) => {
                 nats::Options::with_credentials(creds_path)
+                    .with_name("Borealis Indexer [TLS, Client Auth]")
                     .tls_required(true)
                     .add_root_certificate(root_cert_path)
                     .client_cert(client_cert_path, client_private_key)
-                    .max_reconnects(30)
+                    .reconnect_buffer_size(1024 * 1024 * 1024)
+                    .max_reconnects(1000)
                     .reconnect_callback(|| println!("connection has been reestablished"))
                     .reconnect_delay_callback(|reconnect_attempt| {
-                        core::time::Duration::from_millis(std::cmp::min(
+                        let delay = core::time::Duration::from_millis(std::cmp::min(
                             (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
                                 as u64,
                             1000,
-                        ))
+                        ));
+                        println!("reconnection attempt #{} within delay of {:?} ms...", reconnect_attempt, delay);
+                        delay
                     })
-                    .disconnect_callback(|| println!("connection has been lost"))
-                    .close_callback(|| println!("connection has been closed"))
+                    .disconnect_callback(|| println!("connection has been lost")) // todo: re-run message consumer
+                    .close_callback(|| println!("connection has been closed")) // todo: re-run message consumer
             },
             _ => {
                 nats::Options::with_credentials(creds_path)
-                    .max_reconnects(30)
+                    .with_name("Borealis Indexer [NATS, w/o TLS]")
+                    .reconnect_buffer_size(1024 * 1024 * 1024)
+                    .max_reconnects(1000)
                     .reconnect_callback(|| println!("connection has been reestablished"))
                     .reconnect_delay_callback(|reconnect_attempt| {
-                        core::time::Duration::from_millis(std::cmp::min(
+                        let delay = core::time::Duration::from_millis(std::cmp::min(
                             (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
                                 as u64,
                             1000,
-                        ))
+                        ));
+                        println!("reconnection attempt #{} within delay of {:?} ms...", reconnect_attempt, delay);
+                        delay
                     })
-                    .disconnect_callback(|| println!("connection has been lost"))
-                    .close_callback(|| println!("connection has been closed"))
+                    .disconnect_callback(|| println!("connection has been lost")) // todo: re-run message consumer
+                    .close_callback(|| println!("connection has been closed")) // todo: re-run message consumer
             },
         };
 
@@ -464,15 +476,16 @@ fn main() {
 
     match opts.subcmd {
         SubCommand::Check(run_args) => {
-            nats_connect(run_args);
+            let nats_connection = nats_connect(run_args);
             info!(
                 target: "borealis_consumer",
-                "Connection checked\n"
+                "Checked:\nConnection:\n{:?}",
+                nats_connection
             );
         }
         SubCommand::Init(run_args) => {
             let nats_connection = nats_connect(run_args.to_owned());
-            nats_connection.create_stream(StreamConfig {
+            let stream_info = nats_connection.create_stream(StreamConfig {
                 name: "BlockIndex".to_string(),
                 discard: DiscardPolicy::Old,
                 subjects: Some(vec![format!("{}_{:?}", run_args.subject, run_args.msg_format)]),
@@ -480,7 +493,7 @@ fn main() {
                 storage: StorageType::File,
                 ..Default::default()
             }).expect("IO error, something went wrong while creating a new stream, maybe stream already exist");
-            nats_connection.create_consumer("BlockIndex", ConsumerConfig {
+            let consumer = nats_connection.create_consumer("BlockIndex", ConsumerConfig {
                 deliver_subject: Some(format!("{}_{:?}", run_args.subject, run_args.msg_format)),
                 durable_name: Some(format!("Borealis_Consumer_{}_{:?}", run_args.subject, run_args.msg_format)),
                 deliver_policy: DeliverPolicy::Last,
@@ -493,7 +506,13 @@ fn main() {
             }).expect("IO error, something went wrong while creating a new consumer, maybe consumer already exist");
             info!(
                 target: "borealis_consumer",
-                "Initialized\n"
+                "Initialized:\nStream:\n{:?}\nConsumer:\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}",
+                stream_info,
+                consumer.nc,
+                consumer.stream,
+                consumer.cfg,
+                consumer.push_subscriber,
+                consumer.timeout
             );
         }
         SubCommand::Run(run_args) => {
@@ -510,6 +529,10 @@ fn main() {
                                 "Subscription error: maybe wrong or nonexistent `--subject` name",
                             );
                         loop {
+                            info!(
+                                target: "borealis_consumer",
+                                "Message consumer loop started: listening for new messages\n"
+                            );
                             if let Ok(msg) = subscription.next_timeout(std::time::Duration::from_millis(10000)) {
                                 println!("Received message:\n{}", &msg);
                                 message_consumer(msg, run_args.msg_format);
@@ -534,6 +557,10 @@ fn main() {
                             ..Default::default()
                         }).expect("IO error, something went wrong while creating a new consumer or returning an existent consumer");
                         loop {
+                            info!(
+                                target: "borealis_consumer",
+                                "Message JetStream consumer loop started: listening for new messages\n"
+                            );
                             let message = consumer.process(|msg| {
                                 println!("Received message:\n{}", msg);
                                 Ok(msg.to_owned())

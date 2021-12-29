@@ -52,7 +52,7 @@ pub(crate) struct RunArgs {
     /// Consumer subject, for subscription and to take messages from
     #[clap(long, default_value = "BlockIndex_StreamerMessages")]
     pub subject: String,
-    /// Consuming messages format (`CBOR` or `JSON`)
+    /// Consuming messages format (`CBOR` or `JSON`), suffix for subject name
     #[clap(long, default_value = "CBOR")]
     pub msg_format: MsgFormat,
 }
