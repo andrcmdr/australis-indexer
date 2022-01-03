@@ -2,7 +2,7 @@
 members = [
     "borealis-indexer",
     "borealis-consumer",
-    "borealis-indexer-lib",
-    "borealis-pubsub-lib",
+#   "borealis-indexer-lib",
+#   "borealis-pubsub-lib",
     "borealis-indexer-types",
 ]

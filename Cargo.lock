@@ -607,48 +607,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "borealis-indexer-lib"
-version = "0.1.0"
-dependencies = [
- "actix",
- "borealis-indexer-types",
- "clap",
- "nats",
- "near-indexer",
- "openssl-probe",
- "rand 0.8.4",
- "serde_cbor",
- "serde_json",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "borealis-indexer-types"
 version = "0.1.0"
 dependencies = [
  "near-primitives",
  "rand 0.8.4",
  "serde",
-]
-
-[[package]]
-name = "borealis-pubsub-lib"
-version = "0.1.0"
-dependencies = [
- "actix",
- "borealis-indexer-types",
- "clap",
- "nats",
- "near-indexer",
- "openssl-probe",
- "rand 0.8.4",
- "serde_cbor",
- "serde_json",
- "tokio",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]

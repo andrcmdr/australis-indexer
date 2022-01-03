@@ -52,6 +52,7 @@ impl From/Into<cli::RunArgs> for lib::RunArgs
 nats_connect(run_args) -> Connection
 nats_check_connection(run_args):
 let nc = nats::connect("demo.nats.io")?;
+let nats_connection = nats_connect(run_args);
 https://docs.rs/nats/0.16.0/nats/struct.Connection.html#method.rtt
 println!("server rtt: {:?}", nc.rtt());
 https://docs.rs/nats/0.16.0/nats/struct.Connection.html#method.client_ip
