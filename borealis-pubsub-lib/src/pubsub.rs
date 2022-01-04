@@ -1,3 +1,7 @@
+use tracing_subscriber::EnvFilter;
+
+use core::str::FromStr;
+
 /// CLI options to run Borealis Consumer
 #[derive(Debug, Clone)]
 pub(crate) struct RunArgs {
@@ -30,6 +34,42 @@ impl Default for RunArgs {
     }
 }
 
+/// Consumer work mode
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum WorkMode {
+    Subscriber,
+    Jetstream,
+}
+
+impl FromStr for WorkMode {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Subscriber" | "subscriber" => Ok(WorkMode::Subscriber),
+            "JetStream" | "Jetstream" | "jetstream" => Ok(WorkMode::Jetstream),
+            _ => Err("Unknown consumer work mode: `--work-mode` should be `Subscriber` or `JetStream`".to_string().into()),
+        }
+    }
+}
+
+/// Consuming messages format
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum MsgFormat {
+    Cbor,
+    Json,
+}
+
+impl FromStr for MsgFormat {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "CBOR" | "Cbor" | "cbor" => Ok(MsgFormat::Cbor),
+            "JSON" | "Json" | "json" => Ok(MsgFormat::Json),
+            _ => Err("Unknown message format: `--msg-fomat` should contain `CBOR` or `JSON`".to_string().into()),
+        }
+    }
+}
+
 /// Initialize logging
 pub fn init_logging() {
     // Custom filters
@@ -43,11 +83,10 @@ pub fn init_logging() {
 }
 
 
-Consumer(RunArgs)
-
-impl Default::default() for RunArgs
+impl Consumer for RunArgs
 
 impl From/Into<cli::RunArgs> for lib::RunArgs
+
 
 nats_connect(run_args) -> Connection
 nats_check_connection(run_args):
@@ -61,6 +100,7 @@ https://docs.rs/nats/0.16.0/nats/struct.Connection.html#method.client_id
 println!("id: {:?}", nc.client_id());
 https://docs.rs/nats/0.16.0/nats/struct.Connection.html#method.max_payload
 println!("max payload: {:?}", nc.max_payload());
+
 
 consumer_init(run_args(stream, subject, msg_format))
 https://docs.rs/nats/0.16.0/nats/struct.Connection.html#method.stream_names
@@ -76,11 +116,12 @@ create_jet_stream_consumer_with_start_time(stream, subject, msg_format, start_ti
 
 consumer_run(work_mode, subject, msg_format)
 consumer_subscribe(subject, msg_format) -> subscription
-jet_stream_consumer_create_or_open(stream, subject, msg_format) -> nats::jetstream::Consumer
+| jet_stream_consumer_create_or_open(stream, subject, msg_format) -> nats::jetstream::Consumer
 
 message_consumer(subscription, msg_format)
-message_jetstream_consumer(consumer, msg_format)
+| message_jetstream_consumer(consumer, msg_format)
 message_decode(msg, msg_format) -> RawEvent, Headers, StreamerMessage
+
 
 message_dump/message_print(StreamerMessage)
 message_log(StreamerMessage)

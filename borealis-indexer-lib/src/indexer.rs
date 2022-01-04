@@ -1,3 +1,9 @@
+use near_indexer::near_primitives::types::Gas;
+
+use tracing_subscriber::EnvFilter;
+
+use core::str::FromStr;
+
 /// CLI options to run Borealis Indexer
 #[derive(Debug, Clone)]
 pub struct RunArgs {
@@ -24,6 +30,24 @@ pub struct RunArgs {
 impl Default for RunArgs {
     fn default() -> Self {
         Self
+    }
+}
+
+/// Streaming messages format
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum MsgFormat {
+    Cbor,
+    Json,
+}
+
+impl FromStr for MsgFormat {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "CBOR" | "Cbor" | "cbor" => Ok(MsgFormat::Cbor),
+            "JSON" | "Json" | "json" => Ok(MsgFormat::Json),
+            _ => Err("Unknown message format: `--msg-fomat` should contain `CBOR` or `JSON`".to_string().into()),
+        }
     }
 }
 
@@ -96,10 +120,7 @@ pub fn init_logging() {
 }
 
 
-Producer(RunArgs, InitConfigArgs)
-
-impl Default::default() for RunArgs
-impl Default::default() for InitConfigArgs
+impl Producer for (RunArgs, InitConfigArgs)
 
 impl From/Into<cli::InitConfigArgs> for lib::InitConfigArgs
 impl From/Into<cli::InitConfigArgs> for near_indexer::InitConfigArgs
@@ -125,6 +146,8 @@ producer_init(config_args)
 producer_run(run_args, run_args.sync_mode)
 
 message_producer(events_stream = indexer.streamer(), nats_connection, subject, msg_format)
+| listen_blocks()
+|| handle_message()
 message_encode(msg, msg_format) -> msg_fmt
 message_publish(msg_fmt, subject, msg_format)
 
