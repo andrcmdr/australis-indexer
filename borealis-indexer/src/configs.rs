@@ -60,6 +60,10 @@ pub(crate) struct RunArgs {
     /// Streaming messages format (`CBOR` or `JSON`), suffix for subject name
     #[clap(long, default_value = "CBOR")]
     pub msg_format: MsgFormat,
+    #[clap(long, default_value = "FromInterruption")]
+    pub sync_mode: SyncMode,
+    #[clap(long)]
+    pub block_height: Option<u64>,
 }
 
 /// Streaming messages format
@@ -76,6 +80,29 @@ impl FromStr for MsgFormat {
             "CBOR" | "Cbor" | "cbor" => Ok(MsgFormat::Cbor),
             "JSON" | "Json" | "json" => Ok(MsgFormat::Json),
             _ => Err("Unknown message format: `--msg-fomat` should contain `CBOR` or `JSON`".to_string().into()),
+        }
+    }
+}
+
+/// Definition of a syncing mode for NEAR Indexer
+#[derive(Clap, Debug, Clone, Copy)]
+pub(crate) enum SyncMode {
+    /// Real-time syncing, always taking the latest finalized block to stream
+    LatestSynced,
+    /// Starts syncing from the block NEAR Indexer was interrupted last time
+    FromInterruption,
+    /// Specific block height to start syncing from, RunArgs.block_height should follow after it
+    BlockHeight,
+}
+
+impl FromStr for SyncMode {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "LatestSynced" | "Latestsynced" | "latestsynced" => Ok(SyncMode::LatestSynced),
+            "FromInterruption" | "Frominterruption" | "frominterruption" => Ok(SyncMode::FromInterruption),
+            "BlockHeight" | "Blockheight" | "blockheight" => Ok(SyncMode::BlockHeight),
+            _ => Err("Unknown indexer synchronization mode: `--sync-mode` should be `LatestSynced`, `FromInterruption` or `BlockHeight` with --block-height explicit pointing".to_string().into()),
         }
     }
 }

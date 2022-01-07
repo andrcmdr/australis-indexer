@@ -1,7 +1,7 @@
 use actix;
 use borealis_indexer_types::prelude::BorealisMessage;
 use clap::Clap;
-use configs::{init_logging, MsgFormat, Opts, RunArgs, SubCommand};
+use configs::{init_logging, MsgFormat, SyncMode, Opts, RunArgs, SubCommand};
 use nats;
 use near_indexer;
 use serde_cbor as cbor;
@@ -515,13 +515,15 @@ fn main() {
         SubCommand::Run(run_args) => {
             let indexer_config = near_indexer::IndexerConfig {
                 home_dir,
-                // sync_mode: near_indexer::SyncModeEnum::LatestSynced,
-                // sync_mode: near_indexer::SyncModeEnum::BlockHeight(56180000),
-                // recover and continue message streaming from latest syncing block
-                sync_mode: near_indexer::SyncModeEnum::FromInterruption,
-                // await_for_node_synced: near_indexer::AwaitForNodeSyncedEnum::WaitForFullSync,
+                // recover and continue message streaming from latest synced block (real-time), or from interruption, or from exact block height
+                sync_mode: match run_args.sync_mode {
+                    SyncMode::FromInterruption => near_indexer::SyncModeEnum::FromInterruption,
+                    SyncMode::LatestSynced => near_indexer::SyncModeEnum::LatestSynced,
+                    SyncMode::BlockHeight => near_indexer::SyncModeEnum::BlockHeight(run_args.block_height.unwrap_or(0)),
+                },
                 // stream messages while syncing
                 await_for_node_synced: near_indexer::AwaitForNodeSyncedEnum::StreamWhileSyncing,
+                // await_for_node_synced: near_indexer::AwaitForNodeSyncedEnum::WaitForFullSync,
             };
 
             let nats_connection = nats_connect(run_args.to_owned());
