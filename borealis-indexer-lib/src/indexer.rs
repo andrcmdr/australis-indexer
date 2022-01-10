@@ -1,10 +1,13 @@
 use nats;
+use near_indexer;
 
 use near_indexer::near_primitives::types::Gas;
 
 use tracing_subscriber::EnvFilter;
 
 use core::str::FromStr;
+
+type Error = Box<dyn std::error::Error + 'static>;
 
 /// CLI options to run Borealis Indexer
 #[derive(Debug, Clone)]
@@ -27,6 +30,9 @@ pub struct RunArgs {
     /// Streaming messages format (`CBOR` or `JSON`), suffix for subject name
     #[clap(long, default_value = "CBOR")]
     pub msg_format: MsgFormat,
+    #[clap(long, default_value = "FromInterruption")]
+    pub sync_mode: SyncMode,
+    pub block_height: Option<u64>,
 }
 
 impl Default for RunArgs {
@@ -49,6 +55,29 @@ impl FromStr for MsgFormat {
             "CBOR" | "Cbor" | "cbor" => Ok(MsgFormat::Cbor),
             "JSON" | "Json" | "json" => Ok(MsgFormat::Json),
             _ => Err("Unknown message format: `--msg-fomat` should contain `CBOR` or `JSON`".to_string().into()),
+        }
+    }
+}
+
+/// Definition of a syncing mode for NEAR Indexer
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum SyncMode {
+    /// Real-time syncing, always taking the latest finalized block to stream
+    LatestSynced,
+    /// Starts syncing from the block NEAR Indexer was interrupted last time
+    FromInterruption,
+    /// Specific block height to start syncing from, RunArgs.block_height should follow after it
+    BlockHeight,
+}
+
+impl FromStr for SyncMode {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "LatestSynced" | "Latestsynced" | "latestsynced" => Ok(SyncMode::LatestSynced),
+            "FromInterruption" | "Frominterruption" | "frominterruption" => Ok(SyncMode::FromInterruption),
+            "BlockHeight" | "Blockheight" | "blockheight" => Ok(SyncMode::BlockHeight),
+            _ => Err("Unknown indexer synchronization mode: `--sync-mode` should be `LatestSynced`, `FromInterruption` or `BlockHeight` with --block-height explicit pointing".to_string().into()),
         }
     }
 }
@@ -139,7 +168,13 @@ pub trait Indexer {
 }
 
 impl Indexer for InitConfigArgs {
-    todo!();
+    fn init(&self, home_path: Option<std::path::PathBuf>) {
+        // let home_dir = home_path.unwrap_or(std::path::PathBuf::from(near_indexer::get_default_home()));
+        let home_dir = home_path
+            .unwrap_or(std::path::PathBuf::from("./.borealis-indexer"));
+        
+        near_indexer::indexer_init_configs(&home_dir, self.into());
+    }
 }
 
 impl Producer for RunArgs {
@@ -229,6 +264,41 @@ impl Producer for RunArgs {
         println!("this client IP address, as known by the current NATS server: {:?}", nats_connection.client_ip());
         println!("this client ID, as known by the current NATS server: {:?}", nats_connection.client_id());
         println!("maximum payload size the current NATS server will accept: {:?}", nats_connection.max_payload());
+    }
+
+    fn run(&self, home_path: Option<std::path::PathBuf>) {
+        // let home_dir = home_path.unwrap_or(std::path::PathBuf::from(near_indexer::get_default_home()));
+        let home_dir = home_path
+            .unwrap_or(std::path::PathBuf::from("./.borealis-indexer"));
+
+        let indexer_config = near_indexer::IndexerConfig {
+            home_dir,
+            // recover and continue message streaming from latest synced block (real-time), or from interruption, or from exact block height
+            sync_mode: match self.sync_mode {
+                SyncMode::FromInterruption => near_indexer::SyncModeEnum::FromInterruption,
+                SyncMode::LatestSynced => near_indexer::SyncModeEnum::LatestSynced,
+                SyncMode::BlockHeight => near_indexer::SyncModeEnum::BlockHeight(self.block_height.unwrap_or(0)),
+            },
+            // stream messages while syncing
+            await_for_node_synced: near_indexer::AwaitForNodeSyncedEnum::StreamWhileSyncing,
+            // await_for_node_synced: near_indexer::AwaitForNodeSyncedEnum::WaitForFullSync,
+        };
+
+        let nats_connection = self.nats_connect();
+
+        let system = actix::System::new();
+        system.block_on(async move {
+            let indexer = near_indexer::Indexer::new(indexer_config);
+            let events_stream = indexer.streamer();
+            actix::spawn(self.event_listener(
+                events_stream,
+                nats_connection,
+                self.subject,
+                self.msg_format,
+            ).await);
+            actix::System::current().stop();
+        });
+        system.run().unwrap();
     }
 }
 
