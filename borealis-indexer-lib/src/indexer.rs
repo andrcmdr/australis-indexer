@@ -1,5 +1,11 @@
+use actix;
+use borealis_indexer_types::prelude::BorealisMessage;
 use nats;
 use near_indexer;
+use serde_cbor as cbor;
+use serde_json;
+use tokio::sync::mpsc;
+use tracing::info;
 
 use near_indexer::near_primitives::types::Gas;
 
@@ -44,16 +50,16 @@ impl Default for RunArgs {
 /// Streaming messages format
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum MsgFormat {
-    Cbor,
-    Json,
+    CBOR,
+    JSON,
 }
 
 impl FromStr for MsgFormat {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "CBOR" | "Cbor" | "cbor" => Ok(MsgFormat::Cbor),
-            "JSON" | "Json" | "json" => Ok(MsgFormat::Json),
+            "CBOR" | "Cbor" | "cbor" => Ok(MsgFormat::CBOR),
+            "JSON" | "Json" | "json" => Ok(MsgFormat::JSON),
             _ => Err("Unknown message format: `--msg-fomat` should contain `CBOR` or `JSON`".to_string().into()),
         }
     }
@@ -160,6 +166,7 @@ impl From/Into<cli::RunArgs> for lib::RunArgs
 pub trait Producer {
     fn nats_connect(&self) -> nats::Connection;
     fn nats_check_connection(&self);
+    fn message_encode(&self, msg_seq_id: u64, payload: &T) -> BorealisMessage;
     fn run(&self);
 }
 
@@ -168,6 +175,7 @@ pub trait Indexer {
 }
 
 impl Indexer for InitConfigArgs {
+/// Initialize Indexer's configurations
     fn init(&self, home_path: Option<std::path::PathBuf>) {
         // let home_dir = home_path.unwrap_or(std::path::PathBuf::from(near_indexer::get_default_home()));
         let home_dir = home_path
@@ -178,6 +186,7 @@ impl Indexer for InitConfigArgs {
 }
 
 impl Producer for RunArgs {
+/// Create connection to Borealis NATS Bus
     fn nats_connect(&self) -> nats::Connection {
         let creds_path = self
             .creds_path
@@ -257,6 +266,7 @@ impl Producer for RunArgs {
         nats_connection
     }
 
+/// Check connection to Borealis NATS Bus
     fn nats_check_connection(&self) {
         let nats_connection = self.nats_connect();
         println!("NATS Connection: {:?}", nats_connection);
@@ -264,6 +274,24 @@ impl Producer for RunArgs {
         println!("this client IP address, as known by the current NATS server: {:?}", nats_connection.client_ip());
         println!("this client ID, as known by the current NATS server: {:?}", nats_connection.client_id());
         println!("maximum payload size the current NATS server will accept: {:?}", nats_connection.max_payload());
+    }
+
+/// Create Borealis Message with payload
+    fn message_encode(&self, msg_seq_id: u64, payload: &T) -> BorealisMessage {
+        match self.msg_format {
+            MsgFormat::CBOR => {
+                BorealisMessage::new(
+                    msg_seq_id,
+                    payload,
+                ).to_cbor()
+            }
+            MsgFormat::JSON => {
+                BorealisMessage::new(
+                    msg_seq_id,
+                    payload,
+                ).to_json_bytes()
+            }
+        }
     }
 
     fn run(&self, home_path: Option<std::path::PathBuf>) {
@@ -290,7 +318,7 @@ impl Producer for RunArgs {
         system.block_on(async move {
             let indexer = near_indexer::Indexer::new(indexer_config);
             let events_stream = indexer.streamer();
-            actix::spawn(self.event_listener(
+            actix::spawn(self.block_events_listener(
                 events_stream,
                 nats_connection,
                 self.subject,
@@ -321,7 +349,7 @@ producer_init(config_args)
 producer_run(run_args, run_args.sync_mode)
 
 message_producer(events_stream = indexer.streamer(), nats_connection, subject, msg_format)
-| listen_blocks()
+| block_events_listener()
 || handle_message()
 message_encode(msg, msg_format) -> msg_fmt
 message_publish(msg_fmt, subject, msg_format)
