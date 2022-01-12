@@ -167,6 +167,7 @@ pub trait Producer {
     fn nats_connect(&self) -> nats::Connection;
     fn nats_check_connection(&self);
     fn message_encode(&self, msg_seq_id: u64, payload: &T) -> BorealisMessage;
+    fn message_publish(&self, nats_connection: nats::Connection, message: &T);
     fn run(&self);
 }
 
@@ -293,6 +294,15 @@ impl Producer for RunArgs {
             }
         }
     }
+
+/// Publish (transfer) message to Borealis NATS Bus
+fn message_publish(&self, nats_connection: nats::Connection, message: &T) {
+    nats_connection.publish(
+        format!("{}_{:?}", self.subject, self.msg_format).as_str(),
+        message,
+    )
+    .expect(format!("[Message as {} encoded bytes vector] Message passing error", self.msg_format).as_str());
+}
 
     fn run(&self, home_path: Option<std::path::PathBuf>) {
         // let home_dir = home_path.unwrap_or(std::path::PathBuf::from(near_indexer::get_default_home()));
