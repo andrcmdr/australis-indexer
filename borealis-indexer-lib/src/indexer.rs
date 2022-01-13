@@ -5,6 +5,7 @@ use near_indexer;
 use serde_cbor as cbor;
 use serde_json;
 use tokio::sync::mpsc;
+use tokio_stream;
 use tracing::info;
 
 use near_indexer::near_primitives::types::Gas;
@@ -187,7 +188,7 @@ impl Indexer for InitConfigArgs {
 }
 
 impl Producer for RunArgs {
-/// Create connection to Borealis NATS Bus
+    /// Create connection to Borealis NATS Bus
     fn nats_connect(&self) -> nats::Connection {
         let creds_path = self
             .creds_path
@@ -267,7 +268,7 @@ impl Producer for RunArgs {
         nats_connection
     }
 
-/// Check connection to Borealis NATS Bus
+    /// Check connection to Borealis NATS Bus
     fn nats_check_connection(&self) {
         let nats_connection = self.nats_connect();
         println!("NATS Connection: {:?}", nats_connection);
@@ -277,7 +278,7 @@ impl Producer for RunArgs {
         println!("maximum payload size the current NATS server will accept: {:?}", nats_connection.max_payload());
     }
 
-/// Create Borealis Message with payload
+    /// Create Borealis Message with payload
     fn message_encode(&self, msg_seq_id: u64, payload: &T) -> BorealisMessage {
         match self.msg_format {
             MsgFormat::CBOR => {
@@ -295,14 +296,14 @@ impl Producer for RunArgs {
         }
     }
 
-/// Publish (transfer) message to Borealis NATS Bus
-fn message_publish(&self, nats_connection: nats::Connection, message: &T) {
-    nats_connection.publish(
-        format!("{}_{:?}", self.subject, self.msg_format).as_str(),
-        message,
-    )
-    .expect(format!("[Message as {} encoded bytes vector] Message passing error", self.msg_format).as_str());
-}
+    /// Publish (transfer) message to Borealis NATS Bus
+    fn message_publish(&self, nats_connection: nats::Connection, message: &T) {
+        nats_connection.publish(
+            format!("{}_{:?}", self.subject, self.msg_format).as_str(),
+            message,
+        )
+        .expect(format!("[Message as {} encoded bytes vector] Message passing error", self.msg_format).as_str());
+    }
 
     fn run(&self, home_path: Option<std::path::PathBuf>) {
         // let home_dir = home_path.unwrap_or(std::path::PathBuf::from(near_indexer::get_default_home()));
@@ -328,15 +329,46 @@ fn message_publish(&self, nats_connection: nats::Connection, message: &T) {
         system.block_on(async move {
             let indexer = near_indexer::Indexer::new(indexer_config);
             let events_stream = indexer.streamer();
-            actix::spawn(self.block_events_listener(
+            actix::spawn(self.listen_events(
                 events_stream,
                 nats_connection,
-                self.subject,
-                self.msg_format,
+//              self.subject,
+//              self.msg_format,
             ).await);
             actix::System::current().stop();
         });
         system.run().unwrap();
+    }
+
+    async fn listen_events(&self, events_stream: mpsc::Receiver<near_indexer::StreamerMessage>, nats_connection: nats::Connection) {
+        info!(
+            target: "borealis_indexer",
+            "Message producer loop started: listening for new messages\n"
+        );
+        let handle_messages = tokio_stream::wrappers::ReceiverStream::new(events_stream).map(|streamer_message| async {
+            info!(
+                target: "borealis_indexer",
+                "Message producer loop executed: message received\n"
+            );
+            info!(
+                target: "borealis_indexer",
+                "block_height: #{}, block_hash: {}\n",
+                &streamer_message.block.header.height,
+                &streamer_message.block.header.hash
+            );
+            self.handle_message(streamer_message, nats_connection)
+                .await
+                .map_err(|e| println!("Error: {}", e))
+        });
+        while let Some(_handled_message) = handle_messages.next().await {}
+        // Graceful shutdown
+        info!(target: "borealis_indexer", "Indexer will be shutted down gracefully in 7 seconds...");
+        drop(handle_messages);
+        tokio::time::sleep(std::time::Duration::from_secs(7)).await;
+    }
+
+    async fn handle_message(streamer_message: near_indexer::StreamerMessage, nats_connection: nats::Connection) {
+        todo!()
     }
 }
 
@@ -359,7 +391,7 @@ producer_init(config_args)
 producer_run(run_args, run_args.sync_mode)
 
 message_producer(events_stream = indexer.streamer(), nats_connection, subject, msg_format)
-| block_events_listener()
+| listen_events()
 || handle_message()
 message_encode(msg, msg_format) -> msg_fmt
 message_publish(msg_fmt, subject, msg_format)

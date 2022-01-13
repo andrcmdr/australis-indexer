@@ -612,14 +612,13 @@ version = "0.1.0"
 dependencies = [
  "actix",
  "borealis-indexer-types",
- "clap",
  "nats",
  "near-indexer",
- "openssl-probe",
  "rand 0.8.4",
  "serde_cbor",
  "serde_json",
  "tokio",
+ "tokio-stream",
  "tracing",
  "tracing-subscriber",
 ]
