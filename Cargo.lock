@@ -613,6 +613,8 @@ dependencies = [
  "near-primitives",
  "rand 0.8.4",
  "serde",
+ "serde_cbor",
+ "serde_json",
 ]
 
 [[package]]

@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
 
+use serde_cbor as cbor;
+use serde_json;
+
 pub use near_primitives::hash::CryptoHash;
 pub use near_primitives::{types, views};
 
@@ -14,7 +17,7 @@ pub const BOREALIS_EPOCH: u64 = 1231006505; // Conform to Bitcoin genesis, 2009-
 /// https://github.com/aurora-is-near/borealis.go/blob/a17d266a7a4e0918db743db474332e8474e90f35/events.go#L14-L19
 /// https://github.com/aurora-is-near/borealis-events#message-format
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-pub struct RawEvent<PayloadType> {
+pub struct RawEvent<T> {
     pub version: u8,
     pub event_type: u16,
     pub sequential_id: u64,
@@ -22,11 +25,11 @@ pub struct RawEvent<PayloadType> {
     pub timestamp_ms: u16,
     pub unique_id: [u8; 16],
     //  payload can be an object, string or JSON string for further payload serialization and deserialization with the whole RawEvent message to/from CBOR or JSON format with a byte vector representration for a message transmission
-    pub payload: PayloadType,
+    pub payload: T,
 }
 
-impl<PayloadType> RawEvent<PayloadType> {
-    pub fn new(sequential_id: u64, payload: PayloadType) -> Self {
+impl<T> RawEvent<T> {
+    pub fn new(sequential_id: u64, payload: T) -> Self {
         let version = VERSION;
         let event_type = EVENT_TYPE;
         let now = SystemTime::UNIX_EPOCH.elapsed().unwrap();
@@ -43,6 +46,32 @@ impl<PayloadType> RawEvent<PayloadType> {
             unique_id,
             payload,
         }
+    }
+}
+
+impl<T> RawEvent<T>
+where
+    T: Serialize,
+{
+    pub fn to_cbor(&self) -> Vec<u8> {
+        cbor::to_vec(self).expect("[CBOR bytes vector: RawEvent] Message serialization error")
+    }
+
+    pub fn to_json_bytes(&self) -> Vec<u8> {
+        serde_json::to_vec(&self).expect("[JSON bytes vector: BorealisMessage] Message serialization error")
+    }
+}
+
+impl<'de, T> RawEvent<T>
+where
+    T: Deserialize<'de>,
+{
+    pub fn from_cbor(msg: &'de Vec<u8>) -> Self {
+        cbor::from_slice(msg).expect("[CBOR bytes vector: RawEvent] Message deserialization error")
+    }
+
+    pub fn from_json_bytes(msg: &'de Vec<u8>) -> Self {
+        serde_json::from_slice(msg).expect("[JSON bytes vector: BorealisMessage] Message deserialization error")
     }
 }
 
