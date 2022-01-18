@@ -255,12 +255,8 @@ fn message_consumer(msg: nats::Message, msg_format: MsgFormat) {
 
     // Decoding of RawEvent message receved from NATS subject
     let raw_event: RawEvent<StreamerMessage> = match msg_format {
-        //  MsgFormat::Cbor => cbor::from_slice(msg.to_string().as_bytes())
-        MsgFormat::Cbor => cbor::from_slice(msg.data.as_slice())
-            .expect("[From CBOR bytes vector] Message decoding error"),
-        //  MsgFormat::Json => serde_json::from_slice(msg.to_string().as_bytes())
-        MsgFormat::Json => serde_json::from_slice(msg.data.as_slice())
-            .expect("[From JSON bytes vector] Message decoding error"),
+        MsgFormat::Cbor => RawEvent::from_cbor(msg.data.as_ref()),
+        MsgFormat::Json => RawEvent::from_json_bytes(msg.data.as_ref()),
     };
     // Get StreamerMessage from received RawEvent message
     let streamer_message: StreamerMessage = raw_event.payload;

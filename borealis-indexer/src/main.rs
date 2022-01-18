@@ -265,22 +265,20 @@ async fn message_producer(
             MsgFormat::Cbor => {
                 nc.publish(
                     format!("{}_{:?}", subject, msg_format).as_str(),
-                    cbor::to_vec(&RawEvent::new(
+                    RawEvent::new(
                         streamer_message.block.header.height,
                         &streamer_message,
-                    ))
-                    .unwrap(),
+                    ).to_cbor(),
                 )
                 .expect("[CBOR bytes vector] Message passing error");
             }
             MsgFormat::Json => {
                 nc.publish(
                     format!("{}_{:?}", subject, msg_format).as_str(),
-                    serde_json::to_vec(&RawEvent::new(
+                    RawEvent::new(
                         streamer_message.block.header.height,
                         &streamer_message,
-                    ))
-                    .unwrap(),
+                    ).to_json_bytes(),
                 )
                 .expect("[JSON bytes vector] Message passing error");
             }

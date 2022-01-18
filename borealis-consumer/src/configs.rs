@@ -70,11 +70,7 @@ impl FromStr for WorkMode {
         match s {
             "Subscriber" | "subscriber" => Ok(WorkMode::Subscriber),
             "JetStream" | "Jetstream" | "jetstream" => Ok(WorkMode::Jetstream),
-            _ => Err(
-                "Unknown consumer work mode: `--work-mode` should be `Subscriber` or `JetStream`"
-                    .to_string()
-                    .into(),
-            ),
+            _ => Err("Unknown consumer work mode: `--work-mode` should be `Subscriber` or `JetStream`".to_string().into()),
         }
     }
 }
@@ -92,11 +88,7 @@ impl FromStr for MsgFormat {
         match s {
             "CBOR" | "Cbor" | "cbor" => Ok(MsgFormat::Cbor),
             "JSON" | "Json" | "json" => Ok(MsgFormat::Json),
-            _ => Err(
-                "Unknown message format: `--msg-fomat` should contain `CBOR` or `JSON`"
-                    .to_string()
-                    .into(),
-            ),
+            _ => Err("Unknown message format: `--msg-fomat` should contain `CBOR` or `JSON`".to_string().into()),
         }
     }
 }
