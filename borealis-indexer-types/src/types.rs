@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
 
 use serde_cbor as cbor;
+use serde_cbor::{Deserializer, Value};
 use serde_json;
 
 pub use near_primitives::hash::CryptoHash;
@@ -72,6 +74,99 @@ where
 
     pub fn from_json_bytes(msg: &'de Vec<u8>) -> Self {
         serde_json::from_slice(msg).expect("[JSON bytes vector: BorealisMessage] Message deserialization error")
+    }
+}
+
+/// Borealis Message header
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct Envelope {
+    pub event_type: u16,
+    pub sequential_id: u64,
+    pub timestamp_s: u32,
+    pub timestamp_ms: u16,
+    pub unique_id: [u8; 16],
+}
+
+impl Envelope {
+    pub fn new(sequential_id: u64) -> Self {
+        let event_type = EVENT_TYPE;
+        let now = SystemTime::UNIX_EPOCH.elapsed().unwrap();
+        let timestamp_s = (now.as_secs() - BOREALIS_EPOCH) as u32;
+        let timestamp_ms = (now.as_millis() % 1000) as u16;
+        let unique_id = rand::random();
+
+        Self {
+            event_type,
+            sequential_id,
+            timestamp_s,
+            timestamp_ms,
+            unique_id,
+        }
+    }
+}
+
+/// Separately CBOR/JSON de/serialized header/envelope and body/payload data fields
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct BorealisMessage<T> {
+    pub version: u8,
+    pub envelope: Envelope,
+    //  payload can be an object, string or JSON string for further payload serialization and deserialization with the whole RawEvent message to/from CBOR or JSON format with a byte vector representration for a message transmission
+    pub payload: T,
+}
+
+impl<T> BorealisMessage<T> {
+    pub fn new(sequential_id: u64, payload: T) -> Self {
+        let version = VERSION;
+        let envelope = Envelope::new(sequential_id);
+
+        Self {
+            version,
+            envelope,
+            payload,
+        }
+    }
+}
+
+impl<T> BorealisMessage<T>
+where 
+    T: Serialize,
+{
+    pub fn to_cbor(&self) -> Vec<u8> {
+        let mut message: Vec<u8> = Vec::with_capacity(25000);
+        message.push(self.version);
+        message.extend(cbor::to_vec(&self.envelope).expect("[CBOR bytes vector: envelope] Message serialization error"));
+        message.extend(cbor::to_vec(&self.payload).expect("[CBOR bytes vector: payload] Message serialization error"));
+        message
+    }
+
+    pub fn to_json_bytes(&self) -> Vec<u8> {
+        serde_json::to_vec(&self).expect("[JSON bytes vector: BorealisMessage] Message serialization error")
+    }
+}
+
+impl<T> BorealisMessage<T>
+where 
+    T: DeserializeOwned,
+{
+    pub fn from_cbor(msg: &Vec<u8>) -> Option<Self> {
+        if let Some((version, message)) = msg.split_first() {
+            let mut chunk = Deserializer::from_slice(message).into_iter::<Value>();
+            Some(Self {
+                version: version.to_owned(),
+                envelope: cbor::value::from_value(chunk.next().unwrap().unwrap()).expect("[CBOR bytes vector: envelope] Message deserialization error"),
+                payload: cbor::value::from_value(chunk.next().unwrap().unwrap()).expect("[CBOR bytes vector: payload] Message deserialization error"),
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn from_json_bytes(msg: &Vec<u8>) -> Option<Self> {
+        if msg.len() != 0 {
+            Some(serde_json::from_slice(msg).expect("[JSON bytes vector: BorealisMessage] Message deserialization error"))
+        } else {
+            None
+        }
     }
 }
 
