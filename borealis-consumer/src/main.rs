@@ -254,12 +254,12 @@ fn message_consumer(msg: nats::Message, msg_format: MsgFormat) {
     );
 
     // Decoding of RawEvent message receved from NATS subject
-    let raw_event: BorealisMessage<StreamerMessage> = match msg_format {
+    let borealis_message: BorealisMessage<StreamerMessage> = match msg_format {
         MsgFormat::Cbor => BorealisMessage::from_cbor(msg.data.as_ref()).expect("[From CBOR bytes vector: message empty] Message decoding error"),
         MsgFormat::Json => BorealisMessage::from_json_bytes(msg.data.as_ref()).expect("[From JSON bytes vector: message empty] Message decoding error"),
     };
     // Get StreamerMessage from received RawEvent message
-    let streamer_message: StreamerMessage = raw_event.payload;
+    let streamer_message: StreamerMessage = borealis_message.payload;
 
     // Data handling from `StreamerMessage` data structure. For custom filtering purposes.
     // jq '{block_height: .block.header.height, block_hash: .block.header.hash, block_header_chunk: .block.chunks[0], shard_chunk_header: .shards[0].chunk.header, transactions: .shards[0].chunk.transactions, receipts: .shards[0].chunk.receipts, receipt_execution_outcomes: .shards[0].receipt_execution_outcomes, state_changes: .state_changes}'
