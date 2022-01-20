@@ -1,5 +1,5 @@
 use actix;
-use borealis_indexer_types::prelude::RawEvent;
+use borealis_indexer_types::prelude::BorealisMessage;
 use clap::Clap;
 use configs::{init_logging, MsgFormat, Opts, RunArgs, SubCommand};
 use nats;
@@ -265,7 +265,7 @@ async fn message_producer(
             MsgFormat::Cbor => {
                 nc.publish(
                     format!("{}_{:?}", subject, msg_format).as_str(),
-                    RawEvent::new(
+                    BorealisMessage::new(
                         streamer_message.block.header.height,
                         &streamer_message,
                     ).to_cbor(),
@@ -275,7 +275,7 @@ async fn message_producer(
             MsgFormat::Json => {
                 nc.publish(
                     format!("{}_{:?}", subject, msg_format).as_str(),
-                    RawEvent::new(
+                    BorealisMessage::new(
                         streamer_message.block.header.height,
                         &streamer_message,
                     ).to_json_bytes(),

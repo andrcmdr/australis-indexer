@@ -7,7 +7,7 @@ use nats::jetstream::{
     RetentionPolicy, StorageType, StreamConfig,
 };
 // use near_indexer::StreamerMessage;
-use borealis_indexer_types::prelude::{RawEvent, StreamerMessage};
+use borealis_indexer_types::prelude::{BorealisMessage, StreamerMessage};
 use serde_cbor as cbor;
 use serde_json;
 use tracing::info;
@@ -254,9 +254,9 @@ fn message_consumer(msg: nats::Message, msg_format: MsgFormat) {
     );
 
     // Decoding of RawEvent message receved from NATS subject
-    let raw_event: RawEvent<StreamerMessage> = match msg_format {
-        MsgFormat::Cbor => RawEvent::from_cbor(msg.data.as_ref()),
-        MsgFormat::Json => RawEvent::from_json_bytes(msg.data.as_ref()),
+    let raw_event: BorealisMessage<StreamerMessage> = match msg_format {
+        MsgFormat::Cbor => BorealisMessage::from_cbor(msg.data.as_ref()).expect("[From CBOR bytes vector: message empty] Message decoding error"),
+        MsgFormat::Json => BorealisMessage::from_json_bytes(msg.data.as_ref()).expect("[From JSON bytes vector: message empty] Message decoding error"),
     };
     // Get StreamerMessage from received RawEvent message
     let streamer_message: StreamerMessage = raw_event.payload;
