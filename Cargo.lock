@@ -2389,7 +2389,6 @@ dependencies = [
 [[package]]
 name = "near-indexer"
 version = "0.0.0"
-source = "git+https://github.com/near/nearcore?rev=e72782fe61122049fca63b41fa4e53a21e40bc57#e72782fe61122049fca63b41fa4e53a21e40bc57"
 dependencies = [
  "actix",
  "async-recursion",

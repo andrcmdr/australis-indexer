@@ -12,7 +12,7 @@ license = "GPLv3"
 publish = false
 
 [dependencies]
-near-indexer = { git = "https://github.com/near/nearcore", rev = "e72782fe61122049fca63b41fa4e53a21e40bc57" }
+near-indexer = { path = "../near-indexer" }
 borealis-indexer-types = { path = "../borealis-indexer-types" }
 nats = "0.16.0"
 
