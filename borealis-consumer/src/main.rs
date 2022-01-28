@@ -253,12 +253,12 @@ fn message_consumer(msg: nats::Message, msg_format: MsgFormat) {
         "Message consumer loop executed: message received\n"
     );
 
-    // Decoding of RawEvent message receved from NATS subject
+    // Decoding of Borealis Message receved from NATS subject
     let borealis_message: BorealisMessage<StreamerMessage> = match msg_format {
         MsgFormat::Cbor => BorealisMessage::from_cbor(msg.data.as_ref()).expect("[From CBOR bytes vector: message empty] Message decoding error"),
         MsgFormat::Json => BorealisMessage::from_json_bytes(msg.data.as_ref()).expect("[From JSON bytes vector: message empty] Message decoding error"),
     };
-    // Get StreamerMessage from received RawEvent message
+    // Get StreamerMessage from received Borealis Message
     let streamer_message: StreamerMessage = borealis_message.payload;
 
     // Data handling from `StreamerMessage` data structure. For custom filtering purposes.
