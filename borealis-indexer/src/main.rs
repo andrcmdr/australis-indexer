@@ -510,7 +510,7 @@ fn main() {
             );
         }
         SubCommand::Init(config_args) => {
-            near_indexer::indexer_init_configs(&home_dir, config_args.into());
+            near_indexer::indexer_init_configs(&home_dir, config_args.into()).expect("Error while creating Indexer's initial configuration files");
         }
         SubCommand::Run(run_args) => {
             let indexer_config = near_indexer::IndexerConfig {
@@ -530,7 +530,7 @@ fn main() {
 
             let system = actix::System::new();
             system.block_on(async move {
-                let indexer = near_indexer::Indexer::new(indexer_config);
+                let indexer = near_indexer::Indexer::new(indexer_config).expect("Error while creating Indexer instance");
                 let events_stream = indexer.streamer();
                 actix::spawn(message_producer(
                     events_stream,

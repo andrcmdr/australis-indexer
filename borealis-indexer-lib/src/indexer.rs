@@ -173,7 +173,7 @@ impl Indexer for InitConfigArgs {
         let home_dir = home_path
             .unwrap_or(std::path::PathBuf::from("./.borealis-indexer"));
         
-        near_indexer::indexer_init_configs(&home_dir, self.into());
+        near_indexer::indexer_init_configs(&home_dir, self.into()).expect("Error while creating Indexer's initial configuration files");
     }
 }
 
@@ -288,7 +288,7 @@ impl Producer for RunArgs {
 
         let system = actix::System::new();
         system.block_on(async move {
-            let indexer = near_indexer::Indexer::new(indexer_config);
+            let indexer = near_indexer::Indexer::new(indexer_config).expect("Error while creating Indexer instance");
             let events_stream = indexer.streamer();
             actix::spawn(self.event_listener(
                 events_stream,
