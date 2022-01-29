@@ -9,7 +9,7 @@ set -f
 
 if [[ "$1" == "help" || "$1" == "h" || "$1" == "?" || "$1" == "" ]]; then
     echo
-    echo -e "bash $0 [ help/h/? | fmt | check | build | genconf/init | exec | exec_logging | exec_logging_cliout ]\n"
+    echo -e "bash $0 [ help/h/? | fmt | check | build | build release | submodules | submodules update | genconf/init | exec | exec_logging | exec_logging_cliout ]\n"
 
 elif [[ "$1" == "fmt" ]]; then
 
@@ -32,10 +32,22 @@ elif [[ "$1" == "check" ]]; then
 
     cargo clippy ;
 
-elif [[ "$1" == "build" ]]; then
+elif [[ "$1" == "build" && "$2" == "" ]]; then
 
     cargo build
-    # cargo build --release
+
+elif [[ "$1" == "build" && "$2" == "release" ]]; then
+
+    cargo build --release
+
+elif [[ "$1" == "submodules" && "$2" == "" ]]; then
+
+    git submodule status;
+    git submodule summary;
+
+elif [[ "$1" == "submodules" && "$2" == "update" ]]; then
+
+    git submodule update --recursive --init
 
 elif [[ "$1" == "genconf" || "$1" == "init" ]]; then
 

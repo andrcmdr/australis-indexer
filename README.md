@@ -7,9 +7,23 @@ Provides NATS based Pub/Sub interface for requesting and fetching data about any
 
 Can be configured and running as NEAR's archival node with access to all blocks from Genesis.
 
-## **Build and run Borealis Indexer using Cargo:**
+## **Build and run Borealis Indexer using make.sh shell helper and Cargo:**
 ```
-bash ./make.sh [ help/h/? | fmt | check | build | genconf/init | exec | exec_logging | exec_logging_cliout ]
+bash ./make.sh [ help/h/? | fmt | check | build | build release | submodules | submodules update | genconf/init | exec | exec_logging | exec_logging_cliout ]
+```
+
+```
+bash ./make.sh fmt
+
+bash ./make.sh check
+
+bash ./make.sh build
+
+bash ./make.sh build release
+
+bash ./make.sh submodules update
+
+bash ./make.sh submodules
 ```
 
 ## **Usage help for Borealis Indexer (after buidling executables):**
