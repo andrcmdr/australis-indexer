@@ -1,7 +1,7 @@
 use actix;
 use borealis_indexer_types::prelude::BorealisMessage;
 use clap::Clap;
-use configs::{init_logging, MsgFormat, SyncMode, Opts, RunArgs, SubCommand};
+use configs::{init_logging, MsgFormat, SyncMode, AwaitSynced, Opts, RunArgs, SubCommand};
 use nats;
 use near_indexer;
 use serde_cbor as cbor;
@@ -16,6 +16,7 @@ async fn message_producer(
     nc: nats::Connection,
     subject: String,
     msg_format: MsgFormat,
+    output_verbosity: bool,
 ) {
     info!(
         target: "borealis_indexer",
@@ -262,22 +263,22 @@ async fn message_producer(
 
         // Stream message to NATS
         match msg_format {
-            MsgFormat::Cbor => {
+            MsgFormat::CBOR => {
                 nc.publish(
                     format!("{}_{:?}", subject, msg_format).as_str(),
                     BorealisMessage::new(
                         streamer_message.block.header.height,
-                        &streamer_message,
+                        serde_json::to_string(&streamer_message).expect("[CBOR bytes vector: BorealisMessage; JSON string: StreamerMessage] Message serialization error"),
                     ).to_cbor(),
                 )
                 .expect("[CBOR bytes vector] Message passing error");
             }
-            MsgFormat::Json => {
+            MsgFormat::JSON => {
                 nc.publish(
                     format!("{}_{:?}", subject, msg_format).as_str(),
                     BorealisMessage::new(
                         streamer_message.block.header.height,
-                        &streamer_message,
+                        serde_json::to_string(&streamer_message).expect("[JSON bytes vector: BorealisMessage; JSON string: StreamerMessage] Message serialization error"),
                     ).to_json_bytes(),
                 )
                 .expect("[JSON bytes vector] Message passing error");
@@ -294,114 +295,145 @@ async fn message_producer(
             streamer_message.block.header.hash
         );
 
-        eprintln!(
+        println!(
             "block_height: #{}, block_hash: {}\n",
             streamer_message.block.header.height, streamer_message.block.header.hash
         );
 
-        eprintln!(
-            "block_header: {:?}\n",
-            cbor::to_vec(&streamer_message.block.header).unwrap()
+        println!(
+            "streamer_message: {}\n",
+            serde_json::to_string_pretty(&streamer_message).unwrap()
+        );
+        println!(
+            "streamer_message: {}\n",
+            serde_json::to_string(&streamer_message).unwrap()
+        );
+        println!(
+            "streamer_message: {}\n",
+            serde_json::to_value(&streamer_message).unwrap()
+        );
+        println!(
+            "streamer_message: {:?}\n",
+            cbor::to_vec(&streamer_message).unwrap()
         );
 
-        eprintln!(
-            "block_header_chunks#: {}\n",
-            streamer_message.block.chunks.len()
-        );
-        streamer_message.block.chunks.iter().for_each(|chunk| {
-            eprintln!(
-                "block_header_chunk: {}\n",
-                serde_json::to_value(chunk).unwrap()
+        if output_verbosity {
+            println!(
+                "block_header: {}\n",
+                serde_json::to_string_pretty(&streamer_message.block.header).unwrap()
             );
-            eprintln!("block_header_chunk: {:?}\n", cbor::to_vec(&chunk).unwrap());
-        });
-
-        eprintln!("shards#: {}\n", streamer_message.shards.len());
-
-        streamer_message.shards.iter().for_each(|shard| {
-            if let Some(chunk) = &shard.chunk {
-                eprintln!(
-                    "shard_chunk_header: {}\n",
-                    serde_json::to_value(chunk.header.to_owned()).unwrap()
-                );
-                eprintln!(
-                    "shard_chunk_header: {:?}\n",
-                    cbor::to_vec(&chunk.header).unwrap()
-                );
-            } else {
-                eprintln!("shard_chunk_header: None\n")
-            }
-        });
-
-        streamer_message.shards.iter().for_each(|shard| {
-            if let Some(chunk) = &shard.chunk {
-                eprintln!("Transactions#: {}\n", chunk.transactions.len())
-            } else {
-                eprintln!("Transactions#: None\n")
-            }
-        });
-        streamer_message.shards.iter().for_each(|shard| {
-            if let Some(chunk) = &shard.chunk {
-                eprintln!(
-                    "Transactions: {}\n",
-                    serde_json::to_value(chunk.transactions.to_owned()).unwrap()
-                );
-                eprintln!(
-                    "Transactions: {:?}\n",
-                    cbor::to_vec(&chunk.transactions).unwrap()
-                );
-            } else {
-                eprintln!("Transactions: None\n")
-            }
-        });
-
-        streamer_message.shards.iter().for_each(|shard| {
-            if let Some(chunk) = &shard.chunk {
-                eprintln!("Receipts#: {}\n", chunk.receipts.len())
-            } else {
-                eprintln!("Receipts#: None\n")
-            }
-        });
-        streamer_message.shards.iter().for_each(|shard| {
-            if let Some(chunk) = &shard.chunk {
-                eprintln!(
-                    "Receipts: {}\n",
-                    serde_json::to_value(chunk.receipts.to_owned()).unwrap()
-                );
-                eprintln!("Receipts: {:?}\n", cbor::to_vec(&chunk.receipts).unwrap());
-            } else {
-                eprintln!("Receipts: None\n")
-            }
-        });
-
-        streamer_message.shards.iter().for_each(|shard| {
-            eprintln!(
-                "ReceiptExecutionOutcomes#: {}\n",
-                shard.receipt_execution_outcomes.len()
-            )
-        });
-        streamer_message.shards.iter().for_each(|shard| {
-            eprintln!(
-                "ReceiptExecutionOutcome: {}\n",
-                serde_json::to_value(shard.receipt_execution_outcomes.to_owned()).unwrap()
+            println!(
+                "block_header: {}\n",
+                serde_json::to_string(&streamer_message.block.header).unwrap()
             );
-            eprintln!(
-                "ReceiptExecutionOutcome: {:?}\n",
-                cbor::to_vec(&shard.receipt_execution_outcomes).unwrap()
+            println!(
+                "block_header: {}\n",
+                serde_json::to_value(&streamer_message.block.header).unwrap()
             );
-        });
+            println!(
+                "block_header: {:?}\n",
+                cbor::to_vec(&streamer_message.block.header).unwrap()
+            );
 
-        eprintln!("StateChanges#: {}\n", streamer_message.state_changes.len());
-        streamer_message
-            .state_changes
-            .iter()
-            .for_each(|state_change| {
-                eprintln!(
-                    "StateChange: {}\n",
-                    serde_json::to_value(state_change).unwrap()
+            println!(
+                "block_header_chunks#: {}\n",
+                streamer_message.block.chunks.len()
+            );
+            streamer_message.block.chunks.iter().for_each(|chunk| {
+                println!(
+                    "block_header_chunk: {}\n",
+                    serde_json::to_value(chunk).unwrap()
                 );
-                eprintln!("StateChange: {:?}\n", cbor::to_vec(&state_change).unwrap());
+                println!("block_header_chunk: {:?}\n", cbor::to_vec(&chunk).unwrap());
             });
+
+            println!("shards#: {}\n", streamer_message.shards.len());
+
+            streamer_message.shards.iter().for_each(|shard| {
+                if let Some(chunk) = &shard.chunk {
+                    println!(
+                        "shard_chunk_header: {}\n",
+                        serde_json::to_value(chunk.header.to_owned()).unwrap()
+                    );
+                    println!(
+                        "shard_chunk_header: {:?}\n",
+                        cbor::to_vec(&chunk.header).unwrap()
+                    );
+                } else {
+                    println!("shard_chunk_header: None\n")
+                }
+            });
+
+            streamer_message.shards.iter().for_each(|shard| {
+                if let Some(chunk) = &shard.chunk {
+                    println!("Transactions#: {}\n", chunk.transactions.len())
+                } else {
+                    println!("Transactions#: None\n")
+                }
+            });
+            streamer_message.shards.iter().for_each(|shard| {
+                if let Some(chunk) = &shard.chunk {
+                    println!(
+                        "Transactions: {}\n",
+                        serde_json::to_value(chunk.transactions.to_owned()).unwrap()
+                    );
+                    println!(
+                        "Transactions: {:?}\n",
+                        cbor::to_vec(&chunk.transactions).unwrap()
+                    );
+                } else {
+                    println!("Transactions: None\n")
+                }
+            });
+
+            streamer_message.shards.iter().for_each(|shard| {
+                if let Some(chunk) = &shard.chunk {
+                    println!("Receipts#: {}\n", chunk.receipts.len())
+                } else {
+                    println!("Receipts#: None\n")
+                }
+            });
+            streamer_message.shards.iter().for_each(|shard| {
+                if let Some(chunk) = &shard.chunk {
+                    println!(
+                        "Receipts: {}\n",
+                        serde_json::to_value(chunk.receipts.to_owned()).unwrap()
+                    );
+                    println!("Receipts: {:?}\n", cbor::to_vec(&chunk.receipts).unwrap());
+                } else {
+                    println!("Receipts: None\n")
+                }
+            });
+
+            streamer_message.shards.iter().for_each(|shard| {
+                println!(
+                    "ReceiptExecutionOutcomes#: {}\n",
+                    shard.receipt_execution_outcomes.len()
+                )
+            });
+            streamer_message.shards.iter().for_each(|shard| {
+                println!(
+                    "ReceiptExecutionOutcome: {}\n",
+                    serde_json::to_value(shard.receipt_execution_outcomes.to_owned()).unwrap()
+                );
+                println!(
+                    "ReceiptExecutionOutcome: {:?}\n",
+                    cbor::to_vec(&shard.receipt_execution_outcomes).unwrap()
+                );
+            });
+
+            println!("StateChanges#: {}\n", streamer_message.state_changes.len());
+            streamer_message
+                .state_changes
+                .iter()
+                .for_each(|state_change| {
+                    println!(
+                        "StateChange: {}\n",
+                        serde_json::to_value(state_change).unwrap()
+                    );
+                    println!("StateChange: {:?}\n", cbor::to_vec(&state_change).unwrap());
+                });
+        }
     }
 }
 
@@ -517,13 +549,15 @@ fn main() {
                 home_dir,
                 // recover and continue message streaming from latest synced block (real-time), or from interruption, or from exact block height
                 sync_mode: match run_args.sync_mode {
-                    SyncMode::FromInterruption => near_indexer::SyncModeEnum::FromInterruption,
                     SyncMode::LatestSynced => near_indexer::SyncModeEnum::LatestSynced,
+                    SyncMode::FromInterruption => near_indexer::SyncModeEnum::FromInterruption,
                     SyncMode::BlockHeight => near_indexer::SyncModeEnum::BlockHeight(run_args.block_height.unwrap_or(0)),
                 },
-                // stream messages while syncing
-                await_for_node_synced: near_indexer::AwaitForNodeSyncedEnum::StreamWhileSyncing,
-                // await_for_node_synced: near_indexer::AwaitForNodeSyncedEnum::WaitForFullSync,
+                // waiting for full sync or stream messages while syncing
+                await_for_node_synced: match run_args.await_synced {
+                    AwaitSynced::WaitForFullSync => near_indexer::AwaitForNodeSyncedEnum::WaitForFullSync,
+                    AwaitSynced::StreamWhileSyncing => near_indexer::AwaitForNodeSyncedEnum::StreamWhileSyncing,
+                },
             };
 
             let nats_connection = nats_connect(run_args.to_owned());
@@ -537,6 +571,7 @@ fn main() {
                     nats_connection,
                     run_args.subject,
                     run_args.msg_format,
+                    opts.verbose.unwrap_or(false),
                 ));
             });
             system.run().unwrap();

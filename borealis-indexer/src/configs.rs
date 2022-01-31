@@ -13,6 +13,9 @@ type Error = Box<dyn std::error::Error + 'static>;
 #[clap(version = "0.1.0", author = "Aurora <hello@aurora.dev>")]
 #[clap(setting = AppSettings::SubcommandRequiredElseHelp)]
 pub(crate) struct Opts {
+    /// Verbosity level for extensive output to stdout or log
+    #[clap(short, long)]
+    pub verbose: Option<bool>,
     /// Custom directory for configurations and state. Defaults to ./.borealis-indexer/
     #[clap(short, long)]
     pub home_dir: Option<std::path::PathBuf>,
@@ -64,21 +67,23 @@ pub(crate) struct RunArgs {
     pub sync_mode: SyncMode,
     #[clap(long)]
     pub block_height: Option<u64>,
+    #[clap(long, default_value = "StreamWhileSyncing")]
+    pub await_synced: AwaitSynced,
 }
 
-/// Streaming messages format
+/// Streaming messages format (should be upper case, 'cause it's a suffix for `subject` name, and NATS subject is case sensitive)
 #[derive(Clap, Debug, Clone, Copy)]
 pub(crate) enum MsgFormat {
-    Cbor,
-    Json,
+    CBOR,
+    JSON,
 }
 
 impl FromStr for MsgFormat {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "CBOR" | "Cbor" | "cbor" => Ok(MsgFormat::Cbor),
-            "JSON" | "Json" | "json" => Ok(MsgFormat::Json),
+            "CBOR" | "Cbor" | "cbor" => Ok(MsgFormat::CBOR),
+            "JSON" | "Json" | "json" => Ok(MsgFormat::JSON),
             _ => Err("Unknown message format: `--msg-fomat` should contain `CBOR` or `JSON`".to_string().into()),
         }
     }
@@ -103,6 +108,26 @@ impl FromStr for SyncMode {
             "FromInterruption" | "Frominterruption" | "frominterruption" => Ok(SyncMode::FromInterruption),
             "BlockHeight" | "Blockheight" | "blockheight" => Ok(SyncMode::BlockHeight),
             _ => Err("Unknown indexer synchronization mode: `--sync-mode` should be `LatestSynced`, `FromInterruption` or `BlockHeight` with --block-height explicit pointing".to_string().into()),
+        }
+    }
+}
+
+/// Define whether await for node to be fully synced or stream while syncing (useful for indexing from genesis)
+#[derive(Clap, Debug, Clone, Copy)]
+pub(crate) enum AwaitSynced {
+    /// Don't stream until the node is fully synced
+    WaitForFullSync,
+    /// Stream while node is syncing
+    StreamWhileSyncing,
+}
+
+impl FromStr for AwaitSynced {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "WaitForFullSync" | "Waitforfullsync" | "waitforfullsync" => Ok(AwaitSynced::WaitForFullSync),
+            "StreamWhileSyncing" | "Streamwhilesyncing" | "streamwhilesyncing" => Ok(AwaitSynced::StreamWhileSyncing),
+            _ => Err("Unknown indexer node await synchronization mode: `--await-synced` should be `WaitForFullSync` or `StreamWhileSyncing`".to_string().into()),
         }
     }
 }
