@@ -11,6 +11,9 @@ type Error = Box<dyn std::error::Error + 'static>;
 #[clap(version = "0.1.0", author = "Aurora <hello@aurora.dev>")]
 #[clap(setting = AppSettings::SubcommandRequiredElseHelp)]
 pub(crate) struct Opts {
+    /// Verbosity level for extensive output to stdout or log
+    #[clap(short, long)]
+    pub verbose: Option<bool>,
     /// Subcommands
     #[clap(subcommand)]
     pub subcmd: SubCommand,
@@ -75,19 +78,19 @@ impl FromStr for WorkMode {
     }
 }
 
-/// Consuming messages format
+/// Consuming messages format (should be upper case, 'cause it's a suffix for `subject` name, and NATS subject is case sensitive)
 #[derive(Clap, Debug, Clone, Copy)]
 pub(crate) enum MsgFormat {
-    Cbor,
-    Json,
+    CBOR,
+    JSON,
 }
 
 impl FromStr for MsgFormat {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "CBOR" | "Cbor" | "cbor" => Ok(MsgFormat::Cbor),
-            "JSON" | "Json" | "json" => Ok(MsgFormat::Json),
+            "CBOR" | "Cbor" | "cbor" => Ok(MsgFormat::CBOR),
+            "JSON" | "Json" | "json" => Ok(MsgFormat::JSON),
             _ => Err("Unknown message format: `--msg-fomat` should contain `CBOR` or `JSON`".to_string().into()),
         }
     }
