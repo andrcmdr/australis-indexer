@@ -308,24 +308,17 @@ async fn message_producer(
             "streamer_message: {}\n",
             serde_json::to_string(&streamer_message).unwrap()
         );
-        println!(
-            "streamer_message: {}\n",
-            serde_json::to_value(&streamer_message).unwrap()
-        );
-        println!(
-            "streamer_message: {:?}\n",
-            cbor::to_vec(&streamer_message).unwrap()
-        );
 
         if output_verbosity {
             println!(
-                "block_header: {}\n",
-                serde_json::to_string_pretty(&streamer_message.block.header).unwrap()
+                "streamer_message: {}\n",
+                serde_json::to_value(&streamer_message).unwrap()
             );
             println!(
-                "block_header: {}\n",
-                serde_json::to_string(&streamer_message.block.header).unwrap()
+                "streamer_message: {:?}\n",
+                cbor::to_vec(&streamer_message).unwrap()
             );
+
             println!(
                 "block_header: {}\n",
                 serde_json::to_value(&streamer_message.block.header).unwrap()
@@ -348,7 +341,6 @@ async fn message_producer(
             });
 
             println!("shards#: {}\n", streamer_message.shards.len());
-
             streamer_message.shards.iter().for_each(|shard| {
                 if let Some(chunk) = &shard.chunk {
                     println!(
@@ -359,65 +351,43 @@ async fn message_producer(
                         "shard_chunk_header: {:?}\n",
                         cbor::to_vec(&chunk.header).unwrap()
                     );
-                } else {
-                    println!("shard_chunk_header: None\n")
-                }
-            });
 
-            streamer_message.shards.iter().for_each(|shard| {
-                if let Some(chunk) = &shard.chunk {
-                    println!("Transactions#: {}\n", chunk.transactions.len())
-                } else {
-                    println!("Transactions#: None\n")
-                }
-            });
-            streamer_message.shards.iter().for_each(|shard| {
-                if let Some(chunk) = &shard.chunk {
+                    println!("shard_chunk_transactions#: {}\n", chunk.transactions.len());
                     println!(
-                        "Transactions: {}\n",
+                        "shard_chunk_transactions: {}\n",
                         serde_json::to_value(chunk.transactions.to_owned()).unwrap()
                     );
                     println!(
-                        "Transactions: {:?}\n",
+                        "shard_chunk_transactions: {:?}\n",
                         cbor::to_vec(&chunk.transactions).unwrap()
                     );
-                } else {
-                    println!("Transactions: None\n")
-                }
-            });
 
-            streamer_message.shards.iter().for_each(|shard| {
-                if let Some(chunk) = &shard.chunk {
-                    println!("Receipts#: {}\n", chunk.receipts.len())
-                } else {
-                    println!("Receipts#: None\n")
-                }
-            });
-            streamer_message.shards.iter().for_each(|shard| {
-                if let Some(chunk) = &shard.chunk {
+                    println!("shard_chunk_receipts#: {}\n", chunk.receipts.len());
                     println!(
-                        "Receipts: {}\n",
+                        "shard_chunk_receipts: {}\n",
                         serde_json::to_value(chunk.receipts.to_owned()).unwrap()
                     );
-                    println!("Receipts: {:?}\n", cbor::to_vec(&chunk.receipts).unwrap());
+                    println!("shard_chunk_receipts: {:?}\n", cbor::to_vec(&chunk.receipts).unwrap());
                 } else {
-                    println!("Receipts: None\n")
-                }
-            });
+                    println!("shard_chunk_header: None\n");
 
-            streamer_message.shards.iter().for_each(|shard| {
+                    println!("shard_chunk_transactions#: None\n");
+                    println!("shard_chunk_transactions: None\n");
+
+                    println!("shard_chunk_receipts#: None\n");
+                    println!("shard_chunk_receipts: None\n");
+                };
+
                 println!(
-                    "ReceiptExecutionOutcomes#: {}\n",
+                    "shard_receipt_execution_outcomes#: {}\n",
                     shard.receipt_execution_outcomes.len()
-                )
-            });
-            streamer_message.shards.iter().for_each(|shard| {
+                );
                 println!(
-                    "ReceiptExecutionOutcome: {}\n",
+                    "shard_receipt_execution_outcomes: {}\n",
                     serde_json::to_value(shard.receipt_execution_outcomes.to_owned()).unwrap()
                 );
                 println!(
-                    "ReceiptExecutionOutcome: {:?}\n",
+                    "shard_receipt_execution_outcomes: {:?}\n",
                     cbor::to_vec(&shard.receipt_execution_outcomes).unwrap()
                 );
             });
