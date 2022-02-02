@@ -54,19 +54,19 @@ impl FromStr for WorkMode {
     }
 }
 
-/// Consuming messages format
+/// Consuming messages format (should be upper case, 'cause it's a suffix for `subject` name, and NATS subject is case sensitive)
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum MsgFormat {
-    Cbor,
-    Json,
+    CBOR,
+    JSON,
 }
 
 impl FromStr for MsgFormat {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "CBOR" | "Cbor" | "cbor" => Ok(MsgFormat::Cbor),
-            "JSON" | "Json" | "json" => Ok(MsgFormat::Json),
+            "CBOR" | "Cbor" | "cbor" => Ok(MsgFormat::CBOR),
+            "JSON" | "Json" | "json" => Ok(MsgFormat::JSON),
             _ => Err("Unknown message format: `--msg-fomat` should contain `CBOR` or `JSON`".to_string().into()),
         }
     }
@@ -184,6 +184,7 @@ impl Consumer for RunArgs {
 }
 
 
+/*
 nats_connect(run_args) -> Connection
 nats_check_connection(run_args):
 let nc = nats::connect("demo.nats.io")?;
@@ -221,4 +222,5 @@ message_decode(msg, msg_format) -> RawEvent, Headers, StreamerMessage
 
 message_dump/message_print(StreamerMessage)
 message_log(StreamerMessage)
+*/
 

@@ -1,10 +1,10 @@
 [package]
-name = "borealis-pubsub-lib"
+name = "borealis-consumer-lib"
 version = "0.1.0"
 authors = ["Aurora <hello@aurora.dev>"]
 edition = "2021"
 # rust-version = "1.58.0"
-description = "Pub/Sub library for creating NATS producers and consumers for Borealis Bus, NATS based service-oriented bus (MOM/MQ)."
+description = "Library for creating NATS consumers for Borealis Bus, NATS based service-oriented bus (MOM/MQ)."
 homepage = "https://github.com/aurora-is-near/borealis-indexer"
 repository = "https://github.com/aurora-is-near/borealis-indexer"
 license = "GPLv3"
