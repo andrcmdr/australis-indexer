@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 
 use serde_cbor as cbor;
 use serde_cbor::Deserializer;
@@ -61,7 +61,8 @@ where
     }
 
     pub fn to_json_bytes(&self) -> Vec<u8> {
-        serde_json::to_vec(&self).expect("[JSON bytes vector: RawEvent] Message serialization error")
+        serde_json::to_vec(&self)
+            .expect("[JSON bytes vector: RawEvent] Message serialization error")
     }
 
     pub fn to_json_string(&self) -> String {
@@ -79,7 +80,10 @@ where
 {
     pub fn from_cbor(msg: &Vec<u8>) -> Option<Self> {
         if msg.len() != 0 {
-            Some(cbor::from_slice(msg).expect("[CBOR bytes vector: RawEvent] Message deserialization error"))
+            Some(
+                cbor::from_slice(msg)
+                    .expect("[CBOR bytes vector: RawEvent] Message deserialization error"),
+            )
         } else {
             None
         }
@@ -87,7 +91,10 @@ where
 
     pub fn from_json_bytes(msg: &Vec<u8>) -> Option<Self> {
         if msg.len() != 0 {
-            Some(serde_json::from_slice(msg).expect("[JSON bytes vector: RawEvent] Message deserialization error"))
+            Some(
+                serde_json::from_slice(msg)
+                    .expect("[JSON bytes vector: RawEvent] Message deserialization error"),
+            )
         } else {
             None
         }
@@ -95,7 +102,10 @@ where
 
     pub fn from_json_string(msg: &str) -> Option<Self> {
         if msg.len() != 0 {
-            Some(serde_json::from_str(msg).expect("[JSON string: RawEvent] Message deserialization error"))
+            Some(
+                serde_json::from_str(msg)
+                    .expect("[JSON string: RawEvent] Message deserialization error"),
+            )
         } else {
             None
         }
@@ -103,7 +113,10 @@ where
 
     pub fn from_json_value(val: Value) -> Option<Self> {
         if let Some(value) = Some(val) {
-            Some(serde_json::from_value(value).expect("[JSON Value: RawEvent] Message deserialization error"))
+            Some(
+                serde_json::from_value(value)
+                    .expect("[JSON Value: RawEvent] Message deserialization error"),
+            )
         } else {
             None
         }
@@ -167,21 +180,30 @@ where
     pub fn to_cbor(&self) -> Vec<u8> {
         let mut message: Vec<u8> = Vec::with_capacity(25000);
         message.push(self.version);
-        message.extend(cbor::to_vec(&self.envelope).expect("[CBOR bytes vector: envelope] Message serialization error"));
-        message.extend(cbor::to_vec(&self.payload).expect("[CBOR bytes vector: payload] Message serialization error"));
+        message.extend(
+            cbor::to_vec(&self.envelope)
+                .expect("[CBOR bytes vector: envelope] Message serialization error"),
+        );
+        message.extend(
+            cbor::to_vec(&self.payload)
+                .expect("[CBOR bytes vector: payload] Message serialization error"),
+        );
         message
     }
 
     pub fn to_json_bytes(&self) -> Vec<u8> {
-        serde_json::to_vec(&self).expect("[JSON bytes vector: BorealisMessage] Message serialization error")
+        serde_json::to_vec(&self)
+            .expect("[JSON bytes vector: BorealisMessage] Message serialization error")
     }
 
     pub fn to_json_string(&self) -> String {
-        serde_json::to_string(&self).expect("[JSON string: BorealisMessage] Message serialization error")
+        serde_json::to_string(&self)
+            .expect("[JSON string: BorealisMessage] Message serialization error")
     }
 
     pub fn to_json_value(&self) -> Value {
-        serde_json::to_value(&self).expect("[JSON Value: BorealisMessage] Message serialization error")
+        serde_json::to_value(&self)
+            .expect("[JSON Value: BorealisMessage] Message serialization error")
     }
 }
 
@@ -194,8 +216,10 @@ where
             let mut chunk = Deserializer::from_slice(message).into_iter::<cbor::Value>();
             Some(Self {
                 version: version.to_owned(),
-                envelope: cbor::value::from_value(chunk.next().unwrap().unwrap()).expect("[CBOR bytes vector: envelope] Message deserialization error"),
-                payload: cbor::value::from_value(chunk.next().unwrap().unwrap()).expect("[CBOR bytes vector: payload] Message deserialization error"),
+                envelope: cbor::value::from_value(chunk.next().unwrap().unwrap())
+                    .expect("[CBOR bytes vector: envelope] Message deserialization error"),
+                payload: cbor::value::from_value(chunk.next().unwrap().unwrap())
+                    .expect("[CBOR bytes vector: payload] Message deserialization error"),
             })
         } else {
             None
@@ -204,7 +228,10 @@ where
 
     pub fn from_json_bytes(msg: &Vec<u8>) -> Option<Self> {
         if msg.len() != 0 {
-            Some(serde_json::from_slice(msg).expect("[JSON bytes vector: BorealisMessage] Message deserialization error"))
+            Some(
+                serde_json::from_slice(msg)
+                    .expect("[JSON bytes vector: BorealisMessage] Message deserialization error"),
+            )
         } else {
             None
         }
@@ -212,7 +239,10 @@ where
 
     pub fn from_json_string(msg: &str) -> Option<Self> {
         if msg.len() != 0 {
-            Some(serde_json::from_str(msg).expect("[JSON string: BorealisMessage] Message deserialization error"))
+            Some(
+                serde_json::from_str(msg)
+                    .expect("[JSON string: BorealisMessage] Message deserialization error"),
+            )
         } else {
             None
         }
@@ -220,7 +250,10 @@ where
 
     pub fn from_json_value(val: Value) -> Option<Self> {
         if let Some(value) = Some(val) {
-            Some(serde_json::from_value(value).expect("[JSON Value: BorealisMessage] Message deserialization error"))
+            Some(
+                serde_json::from_value(value)
+                    .expect("[JSON Value: BorealisMessage] Message deserialization error"),
+            )
         } else {
             None
         }

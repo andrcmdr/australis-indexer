@@ -106,10 +106,18 @@ impl Indexer {
             ",
             indexer_config.home_dir.join("config.json").display()
         );
-        let nearcore::NearNode { client, view_client, .. } =
-            nearcore::start_with_config(&indexer_config.home_dir, near_config.clone())
-                .with_context(|| "start_with_config")?;
-        Ok(Self { view_client, client, near_config, indexer_config })
+        let nearcore::NearNode {
+            client,
+            view_client,
+            ..
+        } = nearcore::start_with_config(&indexer_config.home_dir, near_config.clone())
+            .with_context(|| "start_with_config")?;
+        Ok(Self {
+            view_client,
+            client,
+            near_config,
+            indexer_config,
+        })
     }
 
     /// Boots up `near_indexer::streamer`, so it monitors the new blocks with chunks, transactions, receipts, and execution outcomes inside. The returned stream handler should be drained and handled on the user side.
@@ -132,7 +140,10 @@ impl Indexer {
     /// Internal client actors just in case. Use on your own risk, backward compatibility is not guaranteed
     pub fn client_actors(
         &self,
-    ) -> (actix::Addr<near_client::ViewClientActor>, actix::Addr<near_client::ClientActor>) {
+    ) -> (
+        actix::Addr<near_client::ViewClientActor>,
+        actix::Addr<near_client::ClientActor>,
+    ) {
         (self.view_client.clone(), self.client.clone())
     }
 }
@@ -146,7 +157,9 @@ pub fn indexer_init_configs(
     init_configs(
         dir,
         params.chain_id.as_deref(),
-        params.account_id.and_then(|account_id| account_id.parse().ok()),
+        params
+            .account_id
+            .and_then(|account_id| account_id.parse().ok()),
         params.test_seed.as_deref(),
         params.num_shards,
         params.fast,

@@ -47,7 +47,10 @@ pub(crate) struct RunArgs {
     pub creds_path: Option<std::path::PathBuf>,
     /// Borealis Bus (NATS based MOM/MQ/SOA service bus) protocol://address:port
     /// Example: "nats://borealis.aurora.dev:4222" or "tls://borealis.aurora.dev:4443" for TLS connection
-    #[clap(long, default_value = "tls://westcoast.nats.backend.aurora.dev:4222,tls://eastcoast.nats.backend.aurora.dev:4222")]
+    #[clap(
+        long,
+        default_value = "tls://westcoast.nats.backend.aurora.dev:4222,tls://eastcoast.nats.backend.aurora.dev:4222"
+    )]
     pub nats_server: String,
     /// Consumer work mode (standard `Subscriber` or `JetStream` subscriber)
     #[clap(long, default_value = "JetStream")]
@@ -73,7 +76,11 @@ impl FromStr for WorkMode {
         match s {
             "Subscriber" | "subscriber" => Ok(WorkMode::Subscriber),
             "JetStream" | "Jetstream" | "jetstream" => Ok(WorkMode::Jetstream),
-            _ => Err("Unknown consumer work mode: `--work-mode` should be `Subscriber` or `JetStream`".to_string().into()),
+            _ => Err(
+                "Unknown consumer work mode: `--work-mode` should be `Subscriber` or `JetStream`"
+                    .to_string()
+                    .into(),
+            ),
         }
     }
 }
@@ -91,7 +98,11 @@ impl FromStr for MsgFormat {
         match s {
             "CBOR" | "Cbor" | "cbor" => Ok(MsgFormat::CBOR),
             "JSON" | "Json" | "json" => Ok(MsgFormat::JSON),
-            _ => Err("Unknown message format: `--msg-fomat` should contain `CBOR` or `JSON`".to_string().into()),
+            _ => Err(
+                "Unknown message format: `--msg-fomat` should contain `CBOR` or `JSON`"
+                    .to_string()
+                    .into(),
+            ),
         }
     }
 }

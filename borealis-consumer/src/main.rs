@@ -255,11 +255,14 @@ fn message_consumer(msg: nats::Message, msg_format: MsgFormat, output_verbosity:
 
     // Decoding of Borealis Message receved from NATS subject
     let borealis_message: BorealisMessage<String> = match msg_format {
-        MsgFormat::CBOR => BorealisMessage::from_cbor(msg.data.as_ref()).expect("[From CBOR bytes vector: message empty] Message decoding error"),
-        MsgFormat::JSON => BorealisMessage::from_json_bytes(msg.data.as_ref()).expect("[From JSON bytes vector: message empty] Message decoding error"),
+        MsgFormat::CBOR => BorealisMessage::from_cbor(msg.data.as_ref())
+            .expect("[From CBOR bytes vector: message empty] Message decoding error"),
+        MsgFormat::JSON => BorealisMessage::from_json_bytes(msg.data.as_ref())
+            .expect("[From JSON bytes vector: message empty] Message decoding error"),
     };
     // Get `StreamerMessage` from received Borealis Message
-    let streamer_message: StreamerMessage = serde_json::from_str(borealis_message.payload.as_str()).expect("[JSON string: StreamerMessage] Message deserialization error");
+    let streamer_message: StreamerMessage = serde_json::from_str(borealis_message.payload.as_str())
+        .expect("[JSON string: StreamerMessage] Message deserialization error");
 
     // Data handling from `StreamerMessage` data structure. For custom filtering purposes.
     // jq '{block_height: .block.header.height, block_hash: .block.header.hash, block_header_chunk: .block.chunks[0], shard_chunk_header: .shards[0].chunk.header, transactions: .shards[0].chunk.transactions, receipts: .shards[0].chunk.receipts, receipt_execution_outcomes: .shards[0].receipt_execution_outcomes, state_changes: .state_changes}'
@@ -276,10 +279,7 @@ fn message_consumer(msg: nats::Message, msg_format: MsgFormat, output_verbosity:
         streamer_message.block.header.height, streamer_message.block.header.hash
     );
 
-    println!(
-        "streamer_message: {}\n",
-        borealis_message.payload.as_str()
-    );
+    println!("streamer_message: {}\n", borealis_message.payload.as_str());
     println!(
         "streamer_message: {}\n",
         serde_json::to_string_pretty(&streamer_message).unwrap()
@@ -347,7 +347,10 @@ fn message_consumer(msg: nats::Message, msg_format: MsgFormat, output_verbosity:
                     "shard_chunk_receipts: {}\n",
                     serde_json::to_value(chunk.receipts.to_owned()).unwrap()
                 );
-                println!("shard_chunk_receipts: {:?}\n", cbor::to_vec(&chunk.receipts).unwrap());
+                println!(
+                    "shard_chunk_receipts: {:?}\n",
+                    cbor::to_vec(&chunk.receipts).unwrap()
+                );
             } else {
                 println!("shard_chunk_header: None\n");
 
@@ -391,72 +394,80 @@ fn nats_connect(connect_args: RunArgs) -> nats::Connection {
         .creds_path
         .unwrap_or(std::path::PathBuf::from("./.nats/seed/nats.creds"));
 
-    let options =
-        match (
-            connect_args.root_cert_path,
-            connect_args.client_cert_path,
-            connect_args.client_private_key,
-        ) {
-            (Some(root_cert_path), None, None) => {
-                nats::Options::with_credentials(creds_path)
-                    .with_name("Borealis Indexer [TLS]")
-                    .tls_required(true)
-                    .add_root_certificate(root_cert_path)
-                    .reconnect_buffer_size(1024 * 1024 * 1024)
-                    .max_reconnects(1000)
-                    .reconnect_callback(|| println!("connection has been reestablished"))
-                    .reconnect_delay_callback(|reconnect_attempt| {
-                        let delay = core::time::Duration::from_millis(std::cmp::min(
-                            (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
-                                as u64,
-                            1000,
-                        ));
-                        println!("reconnection attempt #{} within delay of {:?} ms...", reconnect_attempt, delay);
-                        delay
-                    })
-                    .disconnect_callback(|| println!("connection has been lost")) // todo: re-run message consumer
-                    .close_callback(|| println!("connection has been closed")) // todo: re-run message consumer
-            },
-            (Some(root_cert_path), Some(client_cert_path), Some(client_private_key)) => {
-                nats::Options::with_credentials(creds_path)
-                    .with_name("Borealis Indexer [TLS, Client Auth]")
-                    .tls_required(true)
-                    .add_root_certificate(root_cert_path)
-                    .client_cert(client_cert_path, client_private_key)
-                    .reconnect_buffer_size(1024 * 1024 * 1024)
-                    .max_reconnects(1000)
-                    .reconnect_callback(|| println!("connection has been reestablished"))
-                    .reconnect_delay_callback(|reconnect_attempt| {
-                        let delay = core::time::Duration::from_millis(std::cmp::min(
-                            (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
-                                as u64,
-                            1000,
-                        ));
-                        println!("reconnection attempt #{} within delay of {:?} ms...", reconnect_attempt, delay);
-                        delay
-                    })
-                    .disconnect_callback(|| println!("connection has been lost")) // todo: re-run message consumer
-                    .close_callback(|| println!("connection has been closed")) // todo: re-run message consumer
-            },
-            _ => {
-                nats::Options::with_credentials(creds_path)
-                    .with_name("Borealis Indexer [NATS, w/o TLS]")
-                    .reconnect_buffer_size(1024 * 1024 * 1024)
-                    .max_reconnects(1000)
-                    .reconnect_callback(|| println!("connection has been reestablished"))
-                    .reconnect_delay_callback(|reconnect_attempt| {
-                        let delay = core::time::Duration::from_millis(std::cmp::min(
-                            (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
-                                as u64,
-                            1000,
-                        ));
-                        println!("reconnection attempt #{} within delay of {:?} ms...", reconnect_attempt, delay);
-                        delay
-                    })
-                    .disconnect_callback(|| println!("connection has been lost")) // todo: re-run message consumer
-                    .close_callback(|| println!("connection has been closed")) // todo: re-run message consumer
-            },
-        };
+    let options = match (
+        connect_args.root_cert_path,
+        connect_args.client_cert_path,
+        connect_args.client_private_key,
+    ) {
+        (Some(root_cert_path), None, None) => {
+            nats::Options::with_credentials(creds_path)
+                .with_name("Borealis Indexer [TLS]")
+                .tls_required(true)
+                .add_root_certificate(root_cert_path)
+                .reconnect_buffer_size(1024 * 1024 * 1024)
+                .max_reconnects(1000)
+                .reconnect_callback(|| println!("connection has been reestablished"))
+                .reconnect_delay_callback(|reconnect_attempt| {
+                    let delay = core::time::Duration::from_millis(std::cmp::min(
+                        (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
+                            as u64,
+                        1000,
+                    ));
+                    println!(
+                        "reconnection attempt #{} within delay of {:?} ms...",
+                        reconnect_attempt, delay
+                    );
+                    delay
+                })
+                .disconnect_callback(|| println!("connection has been lost")) // todo: re-run message consumer
+                .close_callback(|| println!("connection has been closed")) // todo: re-run message consumer
+        }
+        (Some(root_cert_path), Some(client_cert_path), Some(client_private_key)) => {
+            nats::Options::with_credentials(creds_path)
+                .with_name("Borealis Indexer [TLS, Client Auth]")
+                .tls_required(true)
+                .add_root_certificate(root_cert_path)
+                .client_cert(client_cert_path, client_private_key)
+                .reconnect_buffer_size(1024 * 1024 * 1024)
+                .max_reconnects(1000)
+                .reconnect_callback(|| println!("connection has been reestablished"))
+                .reconnect_delay_callback(|reconnect_attempt| {
+                    let delay = core::time::Duration::from_millis(std::cmp::min(
+                        (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
+                            as u64,
+                        1000,
+                    ));
+                    println!(
+                        "reconnection attempt #{} within delay of {:?} ms...",
+                        reconnect_attempt, delay
+                    );
+                    delay
+                })
+                .disconnect_callback(|| println!("connection has been lost")) // todo: re-run message consumer
+                .close_callback(|| println!("connection has been closed")) // todo: re-run message consumer
+        }
+        _ => {
+            nats::Options::with_credentials(creds_path)
+                .with_name("Borealis Indexer [NATS, w/o TLS]")
+                .reconnect_buffer_size(1024 * 1024 * 1024)
+                .max_reconnects(1000)
+                .reconnect_callback(|| println!("connection has been reestablished"))
+                .reconnect_delay_callback(|reconnect_attempt| {
+                    let delay = core::time::Duration::from_millis(std::cmp::min(
+                        (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
+                            as u64,
+                        1000,
+                    ));
+                    println!(
+                        "reconnection attempt #{} within delay of {:?} ms...",
+                        reconnect_attempt, delay
+                    );
+                    delay
+                })
+                .disconnect_callback(|| println!("connection has been lost")) // todo: re-run message consumer
+                .close_callback(|| println!("connection has been closed")) // todo: re-run message consumer
+        }
+    };
 
     let nats_connection = options
         .connect(&connect_args.nats_server)

@@ -1,7 +1,7 @@
 use actix;
 use borealis_indexer_types::prelude::BorealisMessage;
 use clap::Clap;
-use configs::{init_logging, MsgFormat, SyncMode, AwaitSynced, Opts, RunArgs, SubCommand};
+use configs::{init_logging, AwaitSynced, MsgFormat, Opts, RunArgs, SubCommand, SyncMode};
 use nats;
 use near_indexer;
 use serde_cbor as cbor;
@@ -367,7 +367,10 @@ async fn message_producer(
                         "shard_chunk_receipts: {}\n",
                         serde_json::to_value(chunk.receipts.to_owned()).unwrap()
                     );
-                    println!("shard_chunk_receipts: {:?}\n", cbor::to_vec(&chunk.receipts).unwrap());
+                    println!(
+                        "shard_chunk_receipts: {:?}\n",
+                        cbor::to_vec(&chunk.receipts).unwrap()
+                    );
                 } else {
                     println!("shard_chunk_header: None\n");
 
@@ -412,72 +415,80 @@ fn nats_connect(connect_args: RunArgs) -> nats::Connection {
         .creds_path
         .unwrap_or(std::path::PathBuf::from("./.nats/seed/nats.creds"));
 
-    let options =
-        match (
-            connect_args.root_cert_path,
-            connect_args.client_cert_path,
-            connect_args.client_private_key,
-        ) {
-            (Some(root_cert_path), None, None) => {
-                nats::Options::with_credentials(creds_path)
-                    .with_name("Borealis Indexer [TLS]")
-                    .tls_required(true)
-                    .add_root_certificate(root_cert_path)
-                    .reconnect_buffer_size(1024 * 1024 * 1024)
-                    .max_reconnects(1000)
-                    .reconnect_callback(|| println!("connection has been reestablished"))
-                    .reconnect_delay_callback(|reconnect_attempt| {
-                        let delay = core::time::Duration::from_millis(std::cmp::min(
-                            (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
-                                as u64,
-                            1000,
-                        ));
-                        println!("reconnection attempt #{} within delay of {:?} ms...", reconnect_attempt, delay);
-                        delay
-                    })
-                    .disconnect_callback(|| println!("connection has been lost")) // todo: re-run message producer
-                    .close_callback(|| println!("connection has been closed")) // todo: re-run message producer
-            },
-            (Some(root_cert_path), Some(client_cert_path), Some(client_private_key)) => {
-                nats::Options::with_credentials(creds_path)
-                    .with_name("Borealis Indexer [TLS, Client Auth]")
-                    .tls_required(true)
-                    .add_root_certificate(root_cert_path)
-                    .client_cert(client_cert_path, client_private_key)
-                    .reconnect_buffer_size(1024 * 1024 * 1024)
-                    .max_reconnects(1000)
-                    .reconnect_callback(|| println!("connection has been reestablished"))
-                    .reconnect_delay_callback(|reconnect_attempt| {
-                        let delay = core::time::Duration::from_millis(std::cmp::min(
-                            (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
-                                as u64,
-                            1000,
-                        ));
-                        println!("reconnection attempt #{} within delay of {:?} ms...", reconnect_attempt, delay);
-                        delay
-                    })
-                    .disconnect_callback(|| println!("connection has been lost")) // todo: re-run message producer
-                    .close_callback(|| println!("connection has been closed")) // todo: re-run message producer
-            },
-            _ => {
-                nats::Options::with_credentials(creds_path)
-                    .with_name("Borealis Indexer [NATS, w/o TLS]")
-                    .reconnect_buffer_size(1024 * 1024 * 1024)
-                    .max_reconnects(1000)
-                    .reconnect_callback(|| println!("connection has been reestablished"))
-                    .reconnect_delay_callback(|reconnect_attempt| {
-                        let delay = core::time::Duration::from_millis(std::cmp::min(
-                            (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
-                                as u64,
-                            1000,
-                        ));
-                        println!("reconnection attempt #{} within delay of {:?} ms...", reconnect_attempt, delay);
-                        delay
-                    })
-                    .disconnect_callback(|| println!("connection has been lost")) // todo: re-run message producer
-                    .close_callback(|| println!("connection has been closed")) // todo: re-run message producer
-            },
-        };
+    let options = match (
+        connect_args.root_cert_path,
+        connect_args.client_cert_path,
+        connect_args.client_private_key,
+    ) {
+        (Some(root_cert_path), None, None) => {
+            nats::Options::with_credentials(creds_path)
+                .with_name("Borealis Indexer [TLS]")
+                .tls_required(true)
+                .add_root_certificate(root_cert_path)
+                .reconnect_buffer_size(1024 * 1024 * 1024)
+                .max_reconnects(1000)
+                .reconnect_callback(|| println!("connection has been reestablished"))
+                .reconnect_delay_callback(|reconnect_attempt| {
+                    let delay = core::time::Duration::from_millis(std::cmp::min(
+                        (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
+                            as u64,
+                        1000,
+                    ));
+                    println!(
+                        "reconnection attempt #{} within delay of {:?} ms...",
+                        reconnect_attempt, delay
+                    );
+                    delay
+                })
+                .disconnect_callback(|| println!("connection has been lost")) // todo: re-run message producer
+                .close_callback(|| println!("connection has been closed")) // todo: re-run message producer
+        }
+        (Some(root_cert_path), Some(client_cert_path), Some(client_private_key)) => {
+            nats::Options::with_credentials(creds_path)
+                .with_name("Borealis Indexer [TLS, Client Auth]")
+                .tls_required(true)
+                .add_root_certificate(root_cert_path)
+                .client_cert(client_cert_path, client_private_key)
+                .reconnect_buffer_size(1024 * 1024 * 1024)
+                .max_reconnects(1000)
+                .reconnect_callback(|| println!("connection has been reestablished"))
+                .reconnect_delay_callback(|reconnect_attempt| {
+                    let delay = core::time::Duration::from_millis(std::cmp::min(
+                        (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
+                            as u64,
+                        1000,
+                    ));
+                    println!(
+                        "reconnection attempt #{} within delay of {:?} ms...",
+                        reconnect_attempt, delay
+                    );
+                    delay
+                })
+                .disconnect_callback(|| println!("connection has been lost")) // todo: re-run message producer
+                .close_callback(|| println!("connection has been closed")) // todo: re-run message producer
+        }
+        _ => {
+            nats::Options::with_credentials(creds_path)
+                .with_name("Borealis Indexer [NATS, w/o TLS]")
+                .reconnect_buffer_size(1024 * 1024 * 1024)
+                .max_reconnects(1000)
+                .reconnect_callback(|| println!("connection has been reestablished"))
+                .reconnect_delay_callback(|reconnect_attempt| {
+                    let delay = core::time::Duration::from_millis(std::cmp::min(
+                        (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
+                            as u64,
+                        1000,
+                    ));
+                    println!(
+                        "reconnection attempt #{} within delay of {:?} ms...",
+                        reconnect_attempt, delay
+                    );
+                    delay
+                })
+                .disconnect_callback(|| println!("connection has been lost")) // todo: re-run message producer
+                .close_callback(|| println!("connection has been closed")) // todo: re-run message producer
+        }
+    };
 
     let nats_connection = options
         .connect(&connect_args.nats_server)
@@ -512,7 +523,8 @@ fn main() {
             );
         }
         SubCommand::Init(config_args) => {
-            near_indexer::indexer_init_configs(&home_dir, config_args.into()).expect("Error while creating Indexer's initial configuration files");
+            near_indexer::indexer_init_configs(&home_dir, config_args.into())
+                .expect("Error while creating Indexer's initial configuration files");
         }
         SubCommand::Run(run_args) => {
             let indexer_config = near_indexer::IndexerConfig {
@@ -521,12 +533,18 @@ fn main() {
                 sync_mode: match run_args.sync_mode {
                     SyncMode::LatestSynced => near_indexer::SyncModeEnum::LatestSynced,
                     SyncMode::FromInterruption => near_indexer::SyncModeEnum::FromInterruption,
-                    SyncMode::BlockHeight => near_indexer::SyncModeEnum::BlockHeight(run_args.block_height.unwrap_or(0)),
+                    SyncMode::BlockHeight => {
+                        near_indexer::SyncModeEnum::BlockHeight(run_args.block_height.unwrap_or(0))
+                    }
                 },
                 // waiting for full sync or stream messages while syncing
                 await_for_node_synced: match run_args.await_synced {
-                    AwaitSynced::WaitForFullSync => near_indexer::AwaitForNodeSyncedEnum::WaitForFullSync,
-                    AwaitSynced::StreamWhileSyncing => near_indexer::AwaitForNodeSyncedEnum::StreamWhileSyncing,
+                    AwaitSynced::WaitForFullSync => {
+                        near_indexer::AwaitForNodeSyncedEnum::WaitForFullSync
+                    }
+                    AwaitSynced::StreamWhileSyncing => {
+                        near_indexer::AwaitForNodeSyncedEnum::StreamWhileSyncing
+                    }
                 },
             };
 
@@ -534,7 +552,8 @@ fn main() {
 
             let system = actix::System::new();
             system.block_on(async move {
-                let indexer = near_indexer::Indexer::new(indexer_config).expect("Error while creating Indexer instance");
+                let indexer = near_indexer::Indexer::new(indexer_config)
+                    .expect("Error while creating Indexer instance");
                 let events_stream = indexer.streamer();
                 actix::spawn(message_producer(
                     events_stream,
