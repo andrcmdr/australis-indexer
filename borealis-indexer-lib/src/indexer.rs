@@ -33,6 +33,8 @@ pub struct RunArgs {
     #[clap(long, default_value = "FromInterruption")]
     pub sync_mode: SyncMode,
     pub block_height: Option<u64>,
+    #[clap(long, default_value = "StreamWhileSyncing")]
+    pub await_synced: AwaitSynced,
 }
 
 impl Default for RunArgs {
@@ -41,19 +43,19 @@ impl Default for RunArgs {
     }
 }
 
-/// Streaming messages format
+/// Streaming messages format (should be upper case, 'cause it's a suffix for `subject` name, and NATS subject is case sensitive)
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum MsgFormat {
-    Cbor,
-    Json,
+    CBOR,
+    JSON,
 }
 
 impl FromStr for MsgFormat {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "CBOR" | "Cbor" | "cbor" => Ok(MsgFormat::Cbor),
-            "JSON" | "Json" | "json" => Ok(MsgFormat::Json),
+            "CBOR" | "Cbor" | "cbor" => Ok(MsgFormat::CBOR),
+            "JSON" | "Json" | "json" => Ok(MsgFormat::JSON),
             _ => Err("Unknown message format: `--msg-fomat` should contain `CBOR` or `JSON`".to_string().into()),
         }
     }
@@ -78,6 +80,26 @@ impl FromStr for SyncMode {
             "FromInterruption" | "Frominterruption" | "frominterruption" => Ok(SyncMode::FromInterruption),
             "BlockHeight" | "Blockheight" | "blockheight" => Ok(SyncMode::BlockHeight),
             _ => Err("Unknown indexer synchronization mode: `--sync-mode` should be `LatestSynced`, `FromInterruption` or `BlockHeight` with --block-height explicit pointing".to_string().into()),
+        }
+    }
+}
+
+/// Define whether await for node to be fully synced or stream while syncing (useful for indexing from genesis)
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum AwaitSynced {
+    /// Don't stream until the node is fully synced
+    WaitForFullSync,
+    /// Stream while node is syncing
+    StreamWhileSyncing,
+}
+
+impl FromStr for AwaitSynced {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "WaitForFullSync" | "Waitforfullsync" | "waitforfullsync" => Ok(AwaitSynced::WaitForFullSync),
+            "StreamWhileSyncing" | "Streamwhilesyncing" | "streamwhilesyncing" => Ok(AwaitSynced::StreamWhileSyncing),
+            _ => Err("Unknown indexer node await synchronization mode: `--await-synced` should be `WaitForFullSync` or `StreamWhileSyncing`".to_string().into()),
         }
     }
 }
@@ -275,13 +297,15 @@ impl Producer for RunArgs {
             home_dir,
             // recover and continue message streaming from latest synced block (real-time), or from interruption, or from exact block height
             sync_mode: match self.sync_mode {
-                SyncMode::FromInterruption => near_indexer::SyncModeEnum::FromInterruption,
                 SyncMode::LatestSynced => near_indexer::SyncModeEnum::LatestSynced,
+                SyncMode::FromInterruption => near_indexer::SyncModeEnum::FromInterruption,
                 SyncMode::BlockHeight => near_indexer::SyncModeEnum::BlockHeight(self.block_height.unwrap_or(0)),
             },
-            // stream messages while syncing
-            await_for_node_synced: near_indexer::AwaitForNodeSyncedEnum::StreamWhileSyncing,
-            // await_for_node_synced: near_indexer::AwaitForNodeSyncedEnum::WaitForFullSync,
+            // waiting for full sync or stream messages while syncing
+            await_for_node_synced: match self.await_synced {
+                AwaitSynced::WaitForFullSync => near_indexer::AwaitForNodeSyncedEnum::WaitForFullSync,
+                AwaitSynced::StreamWhileSyncing => near_indexer::AwaitForNodeSyncedEnum::StreamWhileSyncing,
+            },
         };
 
         let nats_connection = self.nats_connect();
@@ -303,6 +327,7 @@ impl Producer for RunArgs {
 }
 
 
+/*
 nats_connect(run_args) -> Connection
 nats_check_connection(run_args):
 let nc = nats::connect("demo.nats.io")?;
@@ -329,4 +354,5 @@ message_publish(msg_fmt, subject, msg_format)
 
 message_dump/message_print(StreamerMessage)
 message_log(StreamerMessage)
+*/
 
