@@ -13,7 +13,7 @@ type Error = Box<dyn std::error::Error + 'static>;
 pub(crate) struct Opts {
     /// Verbosity level for extensive output to stdout or log
     #[clap(short, long)]
-    pub verbose: Option<bool>,
+    pub verbose: bool,
     /// Subcommands
     #[clap(subcommand)]
     pub subcmd: SubCommand,

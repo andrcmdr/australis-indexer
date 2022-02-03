@@ -15,7 +15,7 @@ type Error = Box<dyn std::error::Error + 'static>;
 pub(crate) struct Opts {
     /// Verbosity level for extensive output to stdout or log
     #[clap(short, long)]
-    pub verbose: Option<bool>,
+    pub verbose: bool,
     /// Custom directory for configurations and state. Defaults to ./.borealis-indexer/
     #[clap(short, long)]
     pub home_dir: Option<std::path::PathBuf>,

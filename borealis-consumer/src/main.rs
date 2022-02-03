@@ -401,71 +401,95 @@ fn nats_connect(connect_args: RunArgs) -> nats::Connection {
     ) {
         (Some(root_cert_path), None, None) => {
             nats::Options::with_credentials(creds_path)
-                .with_name("Borealis Indexer [TLS]")
+                .with_name("Borealis Indexer [TLS, Server Auth]")
                 .tls_required(true)
                 .add_root_certificate(root_cert_path)
                 .reconnect_buffer_size(1024 * 1024 * 1024)
-                .max_reconnects(1000)
-                .reconnect_callback(|| println!("connection has been reestablished"))
-                .reconnect_delay_callback(|reconnect_attempt| {
+                .max_reconnects(100000)
+                .reconnect_callback(|| info!(target: "borealis_consumer", "connection has been reestablished"))
+                .reconnect_delay_callback(|reconnect_try| {
+                    let reconnect_attempt = {
+                        if reconnect_try == 0 {
+                            1 as usize
+                        } else {
+                            reconnect_try
+                        }
+                    };
                     let delay = core::time::Duration::from_millis(std::cmp::min(
-                        (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
+                        (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
                             as u64,
                         1000,
                     ));
-                    println!(
-                        "reconnection attempt #{} within delay of {:?} ms...",
+                    info!(
+                        target: "borealis_consumer",
+                        "reconnection attempt #{} within delay of {:?} ...",
                         reconnect_attempt, delay
                     );
                     delay
                 })
-                .disconnect_callback(|| println!("connection has been lost")) // todo: re-run message consumer
-                .close_callback(|| println!("connection has been closed")) // todo: re-run message consumer
+                .disconnect_callback(|| info!(target: "borealis_consumer", "connection has been lost")) // todo: re-run message consumer
+                .close_callback(|| info!(target: "borealis_consumer", "connection has been closed")) // todo: re-run message consumer
         }
         (Some(root_cert_path), Some(client_cert_path), Some(client_private_key)) => {
             nats::Options::with_credentials(creds_path)
-                .with_name("Borealis Indexer [TLS, Client Auth]")
+                .with_name("Borealis Indexer [TLS, Server Auth, Client Auth]")
                 .tls_required(true)
                 .add_root_certificate(root_cert_path)
                 .client_cert(client_cert_path, client_private_key)
                 .reconnect_buffer_size(1024 * 1024 * 1024)
-                .max_reconnects(1000)
-                .reconnect_callback(|| println!("connection has been reestablished"))
-                .reconnect_delay_callback(|reconnect_attempt| {
+                .max_reconnects(100000)
+                .reconnect_callback(|| info!(target: "borealis_consumer", "connection has been reestablished"))
+                .reconnect_delay_callback(|reconnect_try| {
+                    let reconnect_attempt = {
+                        if reconnect_try == 0 {
+                            1 as usize
+                        } else {
+                            reconnect_try
+                        }
+                    };
                     let delay = core::time::Duration::from_millis(std::cmp::min(
-                        (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
+                        (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
                             as u64,
                         1000,
                     ));
-                    println!(
-                        "reconnection attempt #{} within delay of {:?} ms...",
+                    info!(
+                        target: "borealis_consumer",
+                        "reconnection attempt #{} within delay of {:?} ...",
                         reconnect_attempt, delay
                     );
                     delay
                 })
-                .disconnect_callback(|| println!("connection has been lost")) // todo: re-run message consumer
-                .close_callback(|| println!("connection has been closed")) // todo: re-run message consumer
+                .disconnect_callback(|| info!(target: "borealis_consumer", "connection has been lost")) // todo: re-run message consumer
+                .close_callback(|| info!(target: "borealis_consumer", "connection has been closed")) // todo: re-run message consumer
         }
         _ => {
             nats::Options::with_credentials(creds_path)
-                .with_name("Borealis Indexer [NATS, w/o TLS]")
+                .with_name("Borealis Indexer [NATS, without TLS]")
                 .reconnect_buffer_size(1024 * 1024 * 1024)
-                .max_reconnects(1000)
-                .reconnect_callback(|| println!("connection has been reestablished"))
-                .reconnect_delay_callback(|reconnect_attempt| {
+                .max_reconnects(100000)
+                .reconnect_callback(|| info!(target: "borealis_consumer", "connection has been reestablished"))
+                .reconnect_delay_callback(|reconnect_try| {
+                    let reconnect_attempt = {
+                        if reconnect_try == 0 {
+                            1 as usize
+                        } else {
+                            reconnect_try
+                        }
+                    };
                     let delay = core::time::Duration::from_millis(std::cmp::min(
-                        (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 50..100))
+                        (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
                             as u64,
                         1000,
                     ));
-                    println!(
-                        "reconnection attempt #{} within delay of {:?} ms...",
+                    info!(
+                        target: "borealis_consumer",
+                        "reconnection attempt #{} within delay of {:?} ...",
                         reconnect_attempt, delay
                     );
                     delay
                 })
-                .disconnect_callback(|| println!("connection has been lost")) // todo: re-run message consumer
-                .close_callback(|| println!("connection has been closed")) // todo: re-run message consumer
+                .disconnect_callback(|| info!(target: "borealis_consumer", "connection has been lost")) // todo: re-run message consumer
+                .close_callback(|| info!(target: "borealis_consumer", "connection has been closed")) // todo: re-run message consumer
         }
     };
 
@@ -474,6 +498,14 @@ fn nats_connect(connect_args: RunArgs) -> nats::Connection {
         .expect("NATS connection error or wrong credentials");
 
     nats_connection
+}
+
+fn nats_check_connection(nats_connection: nats::Connection) {
+//  info!(target: "borealis_consumer", "NATS Connection: {:?}", nats_connection);
+    info!(target: "borealis_consumer", "round trip time (rtt) between this client and the current NATS server: {:?}", nats_connection.rtt());
+    info!(target: "borealis_consumer", "this client IP address, as known by the current NATS server: {:?}", nats_connection.client_ip());
+    info!(target: "borealis_consumer", "this client ID, as known by the current NATS server: {:?}", nats_connection.client_id());
+    info!(target: "borealis_consumer", "maximum payload size the current NATS server will accept: {:?}", nats_connection.max_payload());
 }
 
 fn main() {
@@ -489,11 +521,7 @@ fn main() {
     match opts.subcmd {
         SubCommand::Check(run_args) => {
             let nats_connection = nats_connect(run_args);
-            info!(
-                target: "borealis_consumer",
-                "Checked:\nConnection:\n{:?}",
-                nats_connection
-            );
+            nats_check_connection(nats_connection.to_owned());
         }
         SubCommand::Init(run_args) => {
             let nats_connection = nats_connect(run_args.to_owned());
@@ -546,8 +574,8 @@ fn main() {
                                 "Message consumer loop started: listening for new messages\n"
                             );
                             if let Ok(msg) = subscription.next_timeout(std::time::Duration::from_millis(10000)) {
-                                println!("Received message:\n{}", &msg);
-                                message_consumer(msg, run_args.msg_format, opts.verbose.unwrap_or(false));
+                                info!(target: "borealis_consumer", "Received message:\n{}", &msg);
+                                message_consumer(msg, run_args.msg_format, opts.verbose);
                             } else {
                                 info!(
                                     target: "borealis_consumer",
@@ -574,10 +602,10 @@ fn main() {
                                 "Message JetStream consumer loop started: listening for new messages\n"
                             );
                             let message = consumer.process(|msg| {
-                                println!("Received message:\n{}", msg);
+                                info!(target: "borealis_consumer", "Received message:\n{}", msg);
                                 Ok(msg.to_owned())
                             }).expect("IO error, something went wrong while receiving a new message");
-                            message_consumer(message, run_args.msg_format, opts.verbose.unwrap_or(false));
+                            message_consumer(message, run_args.msg_format, opts.verbose);
                         };
                     },
                 }
