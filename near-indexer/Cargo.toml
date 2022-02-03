@@ -4,7 +4,7 @@ version = "0.0.0"
 authors = ["Near Inc <hello@nearprotocol.com>"]
 publish = false
 # Please update rust-toolchain.toml as well when changing version here:
-rust-version = "1.56.0"
+# rust-version = "1.58.1"
 edition = "2021"
 
 [dependencies]
@@ -24,3 +24,4 @@ near-chain-configs = { git = "https://github.com/near/nearcore", rev = "83fc0f7d
 near-crypto = { git = "https://github.com/near/nearcore", rev = "83fc0f7d6b212bacc49f058e7400743de3e59783" }
 near-primitives = { git = "https://github.com/near/nearcore", rev = "83fc0f7d6b212bacc49f058e7400743de3e59783" }
 node-runtime = { git = "https://github.com/near/nearcore", rev = "83fc0f7d6b212bacc49f058e7400743de3e59783" }
+
