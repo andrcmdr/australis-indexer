@@ -1,5 +1,5 @@
 use actix;
-use borealis_indexer_types::prelude::BorealisMessage;
+use borealis_types::prelude::BorealisMessage;
 use nats;
 use near_indexer;
 use serde_cbor as cbor;

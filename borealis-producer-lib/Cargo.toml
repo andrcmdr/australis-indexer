@@ -1,10 +1,10 @@
 [package]
-name = "borealis-indexer-lib"
+name = "borealis-producer-lib"
 version = "0.1.0"
 authors = ["Aurora <hello@aurora.dev>"]
 edition = "2021"
 # rust-version = "1.58.1"
-description = "Borelis Indexer library for creating NEAR indexers and archival nodes, coupled with NATS producers for Borealis Bus, NATS based service-oriented bus (MOM/MQ)."
+description = "Borelis Indexer's library for creating NEAR indexers and archival nodes, coupled with NATS producers for Borealis Bus, NATS based service-oriented bus (MOM/MQ)."
 homepage = "https://github.com/aurora-is-near/borealis-indexer"
 repository = "https://github.com/aurora-is-near/borealis-indexer"
 license = "GPLv3"
@@ -16,7 +16,7 @@ crate-type = ["rlib"]
 
 [dependencies]
 near-indexer = { path = "../near-indexer" }
-borealis-indexer-types = { path = "../borealis-indexer-types" }
+borealis-types = { path = "../borealis-types" }
 nats = "0.16.0"
 
 actix = "=0.11.0-beta.2"

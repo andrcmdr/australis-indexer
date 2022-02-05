@@ -7,7 +7,7 @@ use nats::jetstream::{
     RetentionPolicy, StorageType, StreamConfig,
 };
 // use near_indexer::StreamerMessage;
-use borealis_indexer_types::prelude::{BorealisMessage, StreamerMessage};
+use borealis_types::prelude::{BorealisMessage, StreamerMessage};
 use serde_cbor as cbor;
 use serde_json;
 use tracing::info;

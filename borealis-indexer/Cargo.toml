@@ -13,7 +13,7 @@ publish = false
 
 [dependencies]
 near-indexer = { path = "../near-indexer" }
-borealis-indexer-types = { path = "../borealis-indexer-types" }
+borealis-types = { path = "../borealis-types" }
 nats = "0.16.0"
 
 clap = "3.0.0-beta.1"

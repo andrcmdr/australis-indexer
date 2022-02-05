@@ -551,7 +551,7 @@ name = "borealis-consumer"
 version = "0.1.0"
 dependencies = [
  "actix",
- "borealis-indexer-types",
+ "borealis-types",
  "clap",
  "nats",
  "near-indexer",
@@ -568,7 +568,7 @@ name = "borealis-indexer"
 version = "0.1.0"
 dependencies = [
  "actix",
- "borealis-indexer-types",
+ "borealis-types",
  "clap",
  "nats",
  "near-indexer",
@@ -582,7 +582,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "borealis-indexer-types"
+name = "borealis-types"
 version = "0.1.0"
 dependencies = [
  "near-primitives",

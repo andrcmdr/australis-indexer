@@ -1,5 +1,5 @@
 use actix;
-use borealis_indexer_types::prelude::BorealisMessage;
+use borealis_types::prelude::BorealisMessage;
 use clap::Clap;
 use configs::{init_logging, AwaitSynced, MsgFormat, Opts, RunArgs, SubCommand, SyncMode};
 use nats;
