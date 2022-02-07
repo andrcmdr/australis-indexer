@@ -1,6 +1,6 @@
 use actix;
 use clap::Clap;
-use configs::{init_logging, MsgFormat, Opts, RunArgs, SubCommand, WorkMode};
+use configs::{init_logging, MsgFormat, Opts, RunArgs, SubCommand, VerbosityLevel, WorkMode};
 use nats;
 use nats::jetstream::{
     AckPolicy, Consumer, ConsumerConfig, DeliverPolicy, DiscardPolicy, ReplayPolicy,
@@ -14,7 +14,7 @@ use tracing::info;
 
 pub mod configs;
 
-fn message_consumer(msg: nats::Message, msg_format: MsgFormat, output_verbosity: bool) {
+fn message_consumer(msg: nats::Message, msg_format: MsgFormat, verbosity_level: Option<VerbosityLevel>) {
     /*
         Example of `StreamerMessage` with all data fields (filled with synthetic data, as an example):
 
@@ -254,42 +254,44 @@ fn message_consumer(msg: nats::Message, msg_format: MsgFormat, output_verbosity:
     );
 
     // Decoding of Borealis Message receved from NATS subject
-    let borealis_message: BorealisMessage<String> = match msg_format {
+    let borealis_message: BorealisMessage<StreamerMessage> = match msg_format {
         MsgFormat::CBOR => BorealisMessage::from_cbor(msg.data.as_ref())
             .expect("[From CBOR bytes vector: message empty] Message decoding error"),
         MsgFormat::JSON => BorealisMessage::from_json_bytes(msg.data.as_ref())
             .expect("[From JSON bytes vector: message empty] Message decoding error"),
     };
     // Get `StreamerMessage` from received Borealis Message
-    let streamer_message: StreamerMessage = serde_json::from_str(borealis_message.payload.as_str())
-        .expect("[JSON string: StreamerMessage] Message deserialization error");
+    let streamer_message: StreamerMessage = borealis_message.payload;
 
     // Data handling from `StreamerMessage` data structure. For custom filtering purposes.
-    // jq '{block_height: .block.header.height, block_hash: .block.header.hash, block_header_chunk: .block.chunks[0], shard_chunk_header: .shards[0].chunk.header, transactions: .shards[0].chunk.transactions, receipts: .shards[0].chunk.receipts, receipt_execution_outcomes: .shards[0].receipt_execution_outcomes, state_changes: .state_changes}'
+    // Same as: jq '{block_height: .block.header.height, block_hash: .block.header.hash, block_header_chunk: .block.chunks[0], shard_chunk_header: .shards[0].chunk.header, transactions: .shards[0].chunk.transactions, receipts: .shards[0].chunk.receipts, receipt_execution_outcomes: .shards[0].receipt_execution_outcomes, state_changes: .state_changes}'
 
     info!(
         target: "borealis_consumer",
         "block_height: #{}, block_hash: {}\n",
-        streamer_message.block.header.height,
-        streamer_message.block.header.hash
+        &streamer_message.block.header.height,
+        &streamer_message.block.header.hash
     );
 
-    println!(
-        "block_height: #{}, block_hash: {}\n",
-        streamer_message.block.header.height, streamer_message.block.header.hash
-    );
+    if let Some(_verbosity_level) = verbosity_level {
+        println!(
+            "block_height: #{}, block_hash: {}\n",
+            &streamer_message.block.header.height, &streamer_message.block.header.hash
+        );
+    };
 
-    println!("streamer_message: {}\n", borealis_message.payload.as_str());
-    println!(
-        "streamer_message: {}\n",
-        serde_json::to_string_pretty(&streamer_message).unwrap()
-    );
-    println!(
-        "streamer_message: {}\n",
-        serde_json::to_string(&streamer_message).unwrap()
-    );
+    if let Some(VerbosityLevel::WithStreamerMessageDump) | Some(VerbosityLevel::WithStreamerMessageParse) = verbosity_level {
+        println!(
+            "streamer_message: {}\n",
+            serde_json::to_string_pretty(&streamer_message).unwrap()
+        );
+        println!(
+            "streamer_message: {}\n",
+            serde_json::to_string(&streamer_message).unwrap()
+        );
+    };
 
-    if output_verbosity {
+    if let Some(VerbosityLevel::WithStreamerMessageParse) = verbosity_level {
         println!(
             "streamer_message: {}\n",
             serde_json::to_value(&streamer_message).unwrap()
@@ -315,7 +317,7 @@ fn message_consumer(msg: nats::Message, msg_format: MsgFormat, output_verbosity:
         streamer_message.block.chunks.iter().for_each(|chunk| {
             println!(
                 "block_header_chunk: {}\n",
-                serde_json::to_value(chunk).unwrap()
+                serde_json::to_value(&chunk).unwrap()
             );
             println!("block_header_chunk: {:?}\n", cbor::to_vec(&chunk).unwrap());
         });
@@ -325,7 +327,7 @@ fn message_consumer(msg: nats::Message, msg_format: MsgFormat, output_verbosity:
             if let Some(chunk) = &shard.chunk {
                 println!(
                     "shard_chunk_header: {}\n",
-                    serde_json::to_value(chunk.header.to_owned()).unwrap()
+                    serde_json::to_value(&chunk.header).unwrap()
                 );
                 println!(
                     "shard_chunk_header: {:?}\n",
@@ -335,7 +337,7 @@ fn message_consumer(msg: nats::Message, msg_format: MsgFormat, output_verbosity:
                 println!("shard_chunk_transactions#: {}\n", chunk.transactions.len());
                 println!(
                     "shard_chunk_transactions: {}\n",
-                    serde_json::to_value(chunk.transactions.to_owned()).unwrap()
+                    serde_json::to_value(&chunk.transactions).unwrap()
                 );
                 println!(
                     "shard_chunk_transactions: {:?}\n",
@@ -345,7 +347,7 @@ fn message_consumer(msg: nats::Message, msg_format: MsgFormat, output_verbosity:
                 println!("shard_chunk_receipts#: {}\n", chunk.receipts.len());
                 println!(
                     "shard_chunk_receipts: {}\n",
-                    serde_json::to_value(chunk.receipts.to_owned()).unwrap()
+                    serde_json::to_value(&chunk.receipts).unwrap()
                 );
                 println!(
                     "shard_chunk_receipts: {:?}\n",
@@ -367,7 +369,7 @@ fn message_consumer(msg: nats::Message, msg_format: MsgFormat, output_verbosity:
             );
             println!(
                 "shard_receipt_execution_outcomes: {}\n",
-                serde_json::to_value(shard.receipt_execution_outcomes.to_owned()).unwrap()
+                serde_json::to_value(&shard.receipt_execution_outcomes).unwrap()
             );
             println!(
                 "shard_receipt_execution_outcomes: {:?}\n",
@@ -382,13 +384,14 @@ fn message_consumer(msg: nats::Message, msg_format: MsgFormat, output_verbosity:
             .for_each(|state_change| {
                 println!(
                     "StateChange: {}\n",
-                    serde_json::to_value(state_change).unwrap()
+                    serde_json::to_value(&state_change).unwrap()
                 );
                 println!("StateChange: {:?}\n", cbor::to_vec(&state_change).unwrap());
             });
-    }
+    };
 }
 
+/// Create connection to Borealis NATS Bus
 fn nats_connect(connect_args: RunArgs) -> nats::Connection {
     let creds_path = connect_args
         .creds_path
@@ -494,12 +497,13 @@ fn nats_connect(connect_args: RunArgs) -> nats::Connection {
     };
 
     let nats_connection = options
-        .connect(&connect_args.nats_server)
+        .connect(connect_args.nats_server.as_str())
         .expect("NATS connection error or wrong credentials");
 
     nats_connection
 }
 
+/// Check connection to Borealis NATS Bus
 fn nats_check_connection(nats_connection: nats::Connection) {
 //  info!(target: "borealis_consumer", "NATS Connection: {:?}", nats_connection);
     info!(target: "borealis_consumer", "round trip time (rtt) between this client and the current NATS server: {:?}", nats_connection.rtt());
