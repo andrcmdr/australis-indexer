@@ -15,7 +15,7 @@ type Error = Box<dyn std::error::Error + 'static>;
 pub(crate) struct Opts {
     /// Verbosity level for extensive output to stdout or log
     #[clap(short, long)]
-    pub verbose: bool,
+    pub verbose: Option<VerbosityLevel>,
     /// Custom directory for configurations and state. Defaults to ./.borealis-indexer/
     #[clap(short, long)]
     pub home_dir: Option<std::path::PathBuf>,
@@ -57,7 +57,7 @@ pub(crate) struct RunArgs {
     /// Example: "nats://borealis.aurora.dev:4222" or "tls://borealis.aurora.dev:4443" for TLS connection
     #[clap(
         long,
-        default_value = "tls://westcoast.nats.backend.aurora.dev:4222,tls://eastcoast.nats.backend.aurora.dev:4222"
+        default_value = "tls://eastcoast.nats.backend.aurora.dev:4222,tls://westcoast.nats.backend.aurora.dev:4222"
     )]
     pub nats_server: String,
     /// Stream messages to subject
@@ -135,6 +135,29 @@ impl FromStr for AwaitSynced {
             "WaitForFullSync" | "Waitforfullsync" | "waitforfullsync" => Ok(AwaitSynced::WaitForFullSync),
             "StreamWhileSyncing" | "Streamwhilesyncing" | "streamwhilesyncing" => Ok(AwaitSynced::StreamWhileSyncing),
             _ => Err("Unknown indexer node await synchronization mode: `--await-synced` should be `WaitForFullSync` or `StreamWhileSyncing`".to_string().into()),
+        }
+    }
+}
+
+/// Verbosity level for messages dump to log and stdout:
+/// WithBlockHashHeight - output only block height & hash
+/// WithStreamerMessageDump - full dump of `StreamerMessage`
+/// WithStreamerMessageParse - full dump with full parse of `StreamerMessage`
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum VerbosityLevel {
+    WithBlockHashHeight,
+    WithStreamerMessageDump,
+    WithStreamerMessageParse,
+}
+
+impl FromStr for VerbosityLevel {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "0" | "WithBlockHashHeight" | "Withblockhashheight" | "withblockhashheight" => Ok(VerbosityLevel::WithBlockHashHeight),
+            "1" | "WithStreamerMessageDump" | "Withstreamermessagedump" | "withstreamermessagedump" => Ok(VerbosityLevel::WithStreamerMessageDump),
+            "2" | "WithStreamerMessageParse" | "Withstreamermessageparse" | "withstreamermessageparse" => Ok(VerbosityLevel::WithStreamerMessageParse),
+            _ => Err("Unknown output verbosity level: `--verbose` should be `WithBlockHashHeight` (`0`), `WithStreamerMessageDump` (`1`) or `WithStreamerMessageParse` (`2`)".to_string().into()),
         }
     }
 }

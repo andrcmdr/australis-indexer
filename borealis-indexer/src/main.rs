@@ -1,7 +1,7 @@
 use actix;
 use borealis_types::prelude::BorealisMessage;
 use clap::Clap;
-use configs::{init_logging, AwaitSynced, MsgFormat, Opts, RunArgs, SubCommand, SyncMode};
+use configs::{init_logging, AwaitSynced, MsgFormat, Opts, RunArgs, SubCommand, SyncMode, VerbosityLevel};
 use nats;
 use near_indexer;
 use serde_cbor as cbor;
@@ -16,7 +16,7 @@ async fn message_producer(
     nc: nats::Connection,
     subject: String,
     msg_format: MsgFormat,
-    output_verbosity: bool,
+    verbosity_level: Option<VerbosityLevel>,
 ) {
     info!(
         target: "borealis_indexer",
@@ -268,7 +268,7 @@ async fn message_producer(
                     format!("{}_{:?}", subject, msg_format).as_str(),
                     BorealisMessage::new(
                         streamer_message.block.header.height,
-                        serde_json::to_string(&streamer_message).expect("[CBOR bytes vector: BorealisMessage; JSON string: StreamerMessage] Message serialization error"),
+                        &streamer_message,
                     ).to_cbor(),
                 )
                 .expect("[CBOR bytes vector] Message passing error");
@@ -278,7 +278,7 @@ async fn message_producer(
                     format!("{}_{:?}", subject, msg_format).as_str(),
                     BorealisMessage::new(
                         streamer_message.block.header.height,
-                        serde_json::to_string(&streamer_message).expect("[JSON bytes vector: BorealisMessage; JSON string: StreamerMessage] Message serialization error"),
+                        &streamer_message,
                     ).to_json_bytes(),
                 )
                 .expect("[JSON bytes vector] Message passing error");
@@ -286,30 +286,34 @@ async fn message_producer(
         }
 
         // Data handling from `StreamerMessage` data structure. For custom filtering purposes.
-        // jq '{block_height: .block.header.height, block_hash: .block.header.hash, block_header_chunk: .block.chunks[0], shard_chunk_header: .shards[0].chunk.header, transactions: .shards[0].chunk.transactions, receipts: .shards[0].chunk.receipts, receipt_execution_outcomes: .shards[0].receipt_execution_outcomes, state_changes: .state_changes}'
+        // Same as: jq '{block_height: .block.header.height, block_hash: .block.header.hash, block_header_chunk: .block.chunks[0], shard_chunk_header: .shards[0].chunk.header, transactions: .shards[0].chunk.transactions, receipts: .shards[0].chunk.receipts, receipt_execution_outcomes: .shards[0].receipt_execution_outcomes, state_changes: .state_changes}'
 
         info!(
             target: "borealis_indexer",
             "block_height: #{}, block_hash: {}\n",
-            streamer_message.block.header.height,
-            streamer_message.block.header.hash
+            &streamer_message.block.header.height,
+            &streamer_message.block.header.hash
         );
 
-        println!(
-            "block_height: #{}, block_hash: {}\n",
-            streamer_message.block.header.height, streamer_message.block.header.hash
-        );
+        if let Some(_verbosity_level) = verbosity_level {
+            println!(
+                "block_height: #{}, block_hash: {}\n",
+                &streamer_message.block.header.height, &streamer_message.block.header.hash
+            );
+        };
 
-        println!(
-            "streamer_message: {}\n",
-            serde_json::to_string_pretty(&streamer_message).unwrap()
-        );
-        println!(
-            "streamer_message: {}\n",
-            serde_json::to_string(&streamer_message).unwrap()
-        );
+        if let Some(VerbosityLevel::WithStreamerMessageDump) | Some(VerbosityLevel::WithStreamerMessageParse) = verbosity_level {
+            println!(
+                "streamer_message: {}\n",
+                serde_json::to_string_pretty(&streamer_message).unwrap()
+            );
+            println!(
+                "streamer_message: {}\n",
+                serde_json::to_string(&streamer_message).unwrap()
+            );
+        };
 
-        if output_verbosity {
+        if let Some(VerbosityLevel::WithStreamerMessageParse) = verbosity_level {
             println!(
                 "streamer_message: {}\n",
                 serde_json::to_value(&streamer_message).unwrap()
@@ -335,7 +339,7 @@ async fn message_producer(
             streamer_message.block.chunks.iter().for_each(|chunk| {
                 println!(
                     "block_header_chunk: {}\n",
-                    serde_json::to_value(chunk).unwrap()
+                    serde_json::to_value(&chunk).unwrap()
                 );
                 println!("block_header_chunk: {:?}\n", cbor::to_vec(&chunk).unwrap());
             });
@@ -345,7 +349,7 @@ async fn message_producer(
                 if let Some(chunk) = &shard.chunk {
                     println!(
                         "shard_chunk_header: {}\n",
-                        serde_json::to_value(chunk.header.to_owned()).unwrap()
+                        serde_json::to_value(&chunk.header).unwrap()
                     );
                     println!(
                         "shard_chunk_header: {:?}\n",
@@ -355,7 +359,7 @@ async fn message_producer(
                     println!("shard_chunk_transactions#: {}\n", chunk.transactions.len());
                     println!(
                         "shard_chunk_transactions: {}\n",
-                        serde_json::to_value(chunk.transactions.to_owned()).unwrap()
+                        serde_json::to_value(&chunk.transactions).unwrap()
                     );
                     println!(
                         "shard_chunk_transactions: {:?}\n",
@@ -365,7 +369,7 @@ async fn message_producer(
                     println!("shard_chunk_receipts#: {}\n", chunk.receipts.len());
                     println!(
                         "shard_chunk_receipts: {}\n",
-                        serde_json::to_value(chunk.receipts.to_owned()).unwrap()
+                        serde_json::to_value(&chunk.receipts).unwrap()
                     );
                     println!(
                         "shard_chunk_receipts: {:?}\n",
@@ -387,7 +391,7 @@ async fn message_producer(
                 );
                 println!(
                     "shard_receipt_execution_outcomes: {}\n",
-                    serde_json::to_value(shard.receipt_execution_outcomes.to_owned()).unwrap()
+                    serde_json::to_value(&shard.receipt_execution_outcomes).unwrap()
                 );
                 println!(
                     "shard_receipt_execution_outcomes: {:?}\n",
@@ -402,14 +406,15 @@ async fn message_producer(
                 .for_each(|state_change| {
                     println!(
                         "StateChange: {}\n",
-                        serde_json::to_value(state_change).unwrap()
+                        serde_json::to_value(&state_change).unwrap()
                     );
                     println!("StateChange: {:?}\n", cbor::to_vec(&state_change).unwrap());
                 });
-        }
+        };
     }
 }
 
+/// Create connection to Borealis NATS Bus
 fn nats_connect(connect_args: RunArgs) -> nats::Connection {
     let creds_path = connect_args
         .creds_path
@@ -515,12 +520,13 @@ fn nats_connect(connect_args: RunArgs) -> nats::Connection {
     };
 
     let nats_connection = options
-        .connect(&connect_args.nats_server)
+        .connect(connect_args.nats_server.as_str())
         .expect("NATS connection error or wrong credentials");
 
     nats_connection
 }
 
+/// Check connection to Borealis NATS Bus
 fn nats_check_connection(nats_connection: nats::Connection) {
 //  info!(target: "borealis_indexer", "NATS Connection: {:?}", nats_connection);
     info!(target: "borealis_indexer", "round trip time (rtt) between this client and the current NATS server: {:?}", nats_connection.rtt());
@@ -561,18 +567,12 @@ fn main() {
                 sync_mode: match run_args.sync_mode {
                     SyncMode::LatestSynced => near_indexer::SyncModeEnum::LatestSynced,
                     SyncMode::FromInterruption => near_indexer::SyncModeEnum::FromInterruption,
-                    SyncMode::BlockHeight => {
-                        near_indexer::SyncModeEnum::BlockHeight(run_args.block_height.unwrap_or(0))
-                    }
+                    SyncMode::BlockHeight => near_indexer::SyncModeEnum::BlockHeight(run_args.block_height.unwrap_or(0)),
                 },
                 // waiting for full sync or stream messages while syncing
                 await_for_node_synced: match run_args.await_synced {
-                    AwaitSynced::WaitForFullSync => {
-                        near_indexer::AwaitForNodeSyncedEnum::WaitForFullSync
-                    }
-                    AwaitSynced::StreamWhileSyncing => {
-                        near_indexer::AwaitForNodeSyncedEnum::StreamWhileSyncing
-                    }
+                    AwaitSynced::WaitForFullSync => near_indexer::AwaitForNodeSyncedEnum::WaitForFullSync,
+                    AwaitSynced::StreamWhileSyncing => near_indexer::AwaitForNodeSyncedEnum::StreamWhileSyncing,
                 },
             };
 
