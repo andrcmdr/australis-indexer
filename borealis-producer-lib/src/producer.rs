@@ -7,6 +7,8 @@ use serde_cbor as cbor;
 use serde_json;
 use tokio::sync::mpsc;
 use tokio_stream;
+use futures::StreamExt;
+use anyhow::Result;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
@@ -31,7 +33,7 @@ pub struct RunArgs {
     pub creds_path: Option<std::path::PathBuf>,
     /// Borealis Bus (NATS based MOM/MQ/SOA service bus) protocol://address:port
     /// Example: "nats://borealis.aurora.dev:4222" or "tls://borealis.aurora.dev:4443" for TLS connection
-//  default_value = "tls://westcoast.nats.backend.aurora.dev:4222,tls://eastcoast.nats.backend.aurora.dev:4222"
+//  default_value = "tls://eastcoast.nats.backend.aurora.dev:4222,tls://westcoast.nats.backend.aurora.dev:4222"
     pub nats_server: String,
     /// Stream messages to subject
 //  default_value = "BlockIndex_StreamerMessages"
@@ -48,7 +50,18 @@ pub struct RunArgs {
 
 impl Default for RunArgs {
     fn default() -> Self {
-        Self
+        Self {
+            root_cert_path: Some(std::path::PathBuf::from("./.nats/seed/root-ca.crt")),
+            client_cert_path: None,
+            client_private_key: None,
+            creds_path: Some(std::path::PathBuf::from("./.nats/seed/nats.creds")),
+            nats_server: "tls://eastcoast.nats.backend.aurora.dev:4222,tls://westcoast.nats.backend.aurora.dev:4222".to_string(),
+            subject: "BlockIndex_StreamerMessages_mainnet".to_string(),
+            msg_format: MsgFormat::CBOR,
+            sync_mode: SyncMode::LatestSynced,
+            block_height: None,
+            await_synced: AwaitSynced::WaitForFullSync,
+        }
     }
 }
 
@@ -168,7 +181,20 @@ pub struct InitConfigArgs {
 
 impl Default for InitConfigArgs {
     fn default() -> Self {
-        Self
+        Self {
+            chain_id: Some("mainnet".to_string()),
+            account_id: Some("borealis.indexer.near".to_string()),
+            test_seed: None,
+            num_shards: 1,
+            fast: false,
+            genesis: Some("genesis.json".to_string()),
+            download_genesis: true,
+            download_genesis_url: Some("https://s3-us-west-1.amazonaws.com/build.nearprotocol.com/nearcore-deploy/mainnet/genesis.json".to_string()),
+            download_config: true,
+            download_config_url: Some("https://s3-us-west-1.amazonaws.com/build.nearprotocol.com/nearcore-deploy/mainnet/config.json".to_string()),
+            boot_nodes: Some("ed25519:86EtEy7epneKyrcJwSWP7zsisTkfDRH5CFVszt4qiQYw@35.195.32.249:24567,ed25519:BFB78VTDBBfCY4jCP99zWxhXUcFAZqR22oSx2KEr8UM1@35.229.222.235:24567,ed25519:Cw1YyiX9cybvz3yZcbYdG7oDV6D7Eihdfc8eM1e1KKoh@35.195.27.104:24567,ed25519:33g3PZRdDvzdRpRpFRZLyscJdbMxUA3j3Rf2ktSYwwF8@34.94.132.112:24567,ed25519:CDQFcD9bHUWdc31rDfRi4ZrJczxg8derCzybcac142tK@35.196.209.192:24567".to_string()),
+            max_gas_burnt_view: None,
+        }
     }
 }
 
@@ -236,7 +262,7 @@ pub trait Producer {
     fn message_publish<T: AsRef<[u8]>>(&self, nats_connection: nats::Connection, message: &T);
     fn run(&self, home_path: Option<std::path::PathBuf>);
     async fn listen_events(&self, events_stream: mpsc::Receiver<near_indexer::StreamerMessage>, nats_connection: nats::Connection);
-    async fn handle_message(&self, streamer_message: near_indexer::StreamerMessage, nats_connection: nats::Connection);
+    async fn handle_message(&self, streamer_message: near_indexer::StreamerMessage, nats_connection: nats::Connection) -> anyhow::Result<()>;
     fn message_dump(&self, verbosity_level: Option<VerbosityLevel>, streamer_message: near_indexer::StreamerMessage);
 }
 
@@ -417,10 +443,7 @@ impl Producer for RunArgs {
         system.block_on(async move {
             let indexer = near_indexer::Indexer::new(indexer_config).expect("Error while creating Indexer instance");
             let events_stream = indexer.streamer();
-            actix::spawn(self.listen_events(
-                events_stream,
-                nats_connection,
-            ).await);
+            self.listen_events(events_stream, nats_connection).await;
             actix::System::current().stop();
         });
         system.run().unwrap();
@@ -443,22 +466,21 @@ impl Producer for RunArgs {
                 &streamer_message.block.header.height,
                 &streamer_message.block.header.hash
             );
-            self.handle_message(streamer_message, nats_connection)
-                .await
-                .map_err(|e| println!("Error: {}", e))
+            self.handle_message(streamer_message, nats_connection).await.map_err(|e| println!("Error: {}", e))
         });
         while let Some(_handled_message) = handle_messages.next().await {}
         // Graceful shutdown
-        info!(target: "borealis_indexer", "Indexer will be shutted down gracefully in 7 seconds...");
+        info!(target: "borealis_indexer", "Indexer will be shutted down gracefully in 10 seconds...");
         drop(handle_messages);
-        tokio::time::sleep(std::time::Duration::from_secs(7)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
     }
 
     /// Handle Indexer's state events/messages (`StreamerMessages`) about finalized blocks
-    async fn handle_message(&self, streamer_message: near_indexer::StreamerMessage, nats_connection: nats::Connection) {
+    async fn handle_message(&self, streamer_message: near_indexer::StreamerMessage, nats_connection: nats::Connection) -> anyhow::Result<()> {
         let message = self.message_encode(streamer_message.block.header.height, &streamer_message);
         self.message_publish(nats_connection, &message);
     //  self.message_dump(Some(VerbosityLevel::WithBlockHashHeight), streamer_message);
+        Ok(())
     }
 
     /// Dump information from Indexer's state events/messages (`StreamerMessages`) about finalized blocks
