@@ -5,6 +5,7 @@ use near_indexer::near_primitives::types::Gas;
 use tracing_subscriber::EnvFilter;
 
 use core::str::FromStr;
+use std::string::ToString;
 
 type Error = Box<dyn std::error::Error + 'static>;
 
@@ -77,21 +78,31 @@ pub(crate) struct RunArgs {
 /// Streaming messages format (should be upper case, 'cause it's a suffix for `subject` name, and NATS subject is case sensitive)
 #[derive(Clap, Debug, Clone, Copy)]
 pub(crate) enum MsgFormat {
-    CBOR,
-    JSON,
+    Cbor,
+    Json,
 }
 
 impl FromStr for MsgFormat {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "CBOR" | "Cbor" | "cbor" => Ok(MsgFormat::CBOR),
-            "JSON" | "Json" | "json" => Ok(MsgFormat::JSON),
+        let input = s.to_lowercase();
+        match input.as_str() {
+            "cbor" => Ok(MsgFormat::Cbor),
+            "json" => Ok(MsgFormat::Json),
             _ => Err(
                 "Unknown message format: `--msg-fomat` should contain `CBOR` or `JSON`"
                     .to_string()
                     .into(),
             ),
+        }
+    }
+}
+
+impl ToString for MsgFormat {
+    fn to_string(&self) -> String {
+        match self {
+            MsgFormat::Cbor => String::from("CBOR"),
+            MsgFormat::Json => String::from("JSON"),
         }
     }
 }
@@ -110,10 +121,11 @@ pub(crate) enum SyncMode {
 impl FromStr for SyncMode {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "LatestSynced" | "Latestsynced" | "latestsynced" => Ok(SyncMode::LatestSynced),
-            "FromInterruption" | "Frominterruption" | "frominterruption" => Ok(SyncMode::FromInterruption),
-            "BlockHeight" | "Blockheight" | "blockheight" => Ok(SyncMode::BlockHeight),
+        let input = s.to_lowercase();
+        match input.as_str() {
+            "latestsynced" => Ok(SyncMode::LatestSynced),
+            "frominterruption" => Ok(SyncMode::FromInterruption),
+            "blockheight" => Ok(SyncMode::BlockHeight),
             _ => Err("Unknown indexer synchronization mode: `--sync-mode` should be `LatestSynced`, `FromInterruption` or `BlockHeight` with --block-height explicit pointing".to_string().into()),
         }
     }
@@ -131,9 +143,10 @@ pub(crate) enum AwaitSynced {
 impl FromStr for AwaitSynced {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "WaitForFullSync" | "Waitforfullsync" | "waitforfullsync" => Ok(AwaitSynced::WaitForFullSync),
-            "StreamWhileSyncing" | "Streamwhilesyncing" | "streamwhilesyncing" => Ok(AwaitSynced::StreamWhileSyncing),
+        let input = s.to_lowercase();
+        match input.as_str() {
+            "waitforfullsync" => Ok(AwaitSynced::WaitForFullSync),
+            "streamwhilesyncing" => Ok(AwaitSynced::StreamWhileSyncing),
             _ => Err("Unknown indexer node await synchronization mode: `--await-synced` should be `WaitForFullSync` or `StreamWhileSyncing`".to_string().into()),
         }
     }
@@ -153,10 +166,11 @@ pub enum VerbosityLevel {
 impl FromStr for VerbosityLevel {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "0" | "WithBlockHashHeight" | "Withblockhashheight" | "withblockhashheight" => Ok(VerbosityLevel::WithBlockHashHeight),
-            "1" | "WithStreamerMessageDump" | "Withstreamermessagedump" | "withstreamermessagedump" => Ok(VerbosityLevel::WithStreamerMessageDump),
-            "2" | "WithStreamerMessageParse" | "Withstreamermessageparse" | "withstreamermessageparse" => Ok(VerbosityLevel::WithStreamerMessageParse),
+        let input = s.to_lowercase();
+        match input.as_str() {
+            "0" | "withblockhashheight" => Ok(VerbosityLevel::WithBlockHashHeight),
+            "1" | "withstreamermessagedump" => Ok(VerbosityLevel::WithStreamerMessageDump),
+            "2" | "withstreamermessageparse" => Ok(VerbosityLevel::WithStreamerMessageParse),
             _ => Err("Unknown output verbosity level: `--verbose` should be `WithBlockHashHeight` (`0`), `WithStreamerMessageDump` (`1`) or `WithStreamerMessageParse` (`2`)".to_string().into()),
         }
     }
@@ -231,6 +245,6 @@ pub(crate) fn init_logging() {
     );
     tracing_subscriber::fmt::Subscriber::builder()
         .with_env_filter(env_filter)
-        .with_writer(std::io::stderr)
+        .with_writer(std::io::stdout)
         .init();
 }

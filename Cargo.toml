@@ -3,7 +3,7 @@ members = [
     "borealis-indexer",
     "borealis-consumer",
     "borealis-producer-lib",
-#   "borealis-consumer-lib",
+    "borealis-consumer-lib",
     "borealis-types",
     "near-indexer",
 ]

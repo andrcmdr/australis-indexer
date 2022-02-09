@@ -263,9 +263,9 @@ async fn message_producer(
 
         // Stream message to NATS
         match msg_format {
-            MsgFormat::CBOR => {
+            MsgFormat::Cbor => {
                 nc.publish(
-                    format!("{}_{:?}", subject, msg_format).as_str(),
+                    format!("{}_{}", subject, msg_format.to_string()).as_str(),
                     BorealisMessage::new(
                         streamer_message.block.header.height,
                         &streamer_message,
@@ -273,9 +273,9 @@ async fn message_producer(
                 )
                 .expect("[CBOR bytes vector] Message passing error");
             }
-            MsgFormat::JSON => {
+            MsgFormat::Json => {
                 nc.publish(
-                    format!("{}_{:?}", subject, msg_format).as_str(),
+                    format!("{}_{}", subject, msg_format.to_string()).as_str(),
                     BorealisMessage::new(
                         streamer_message.block.header.height,
                         &streamer_message,

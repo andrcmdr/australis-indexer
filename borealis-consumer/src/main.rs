@@ -255,9 +255,9 @@ fn message_consumer(msg: nats::Message, msg_format: MsgFormat, verbosity_level: 
 
     // Decoding of Borealis Message receved from NATS subject
     let borealis_message: BorealisMessage<StreamerMessage> = match msg_format {
-        MsgFormat::CBOR => BorealisMessage::from_cbor(msg.data.as_ref())
+        MsgFormat::Cbor => BorealisMessage::from_cbor(msg.data.as_ref())
             .expect("[From CBOR bytes vector: message empty] Message decoding error"),
-        MsgFormat::JSON => BorealisMessage::from_json_bytes(msg.data.as_ref())
+        MsgFormat::Json => BorealisMessage::from_json_bytes(msg.data.as_ref())
             .expect("[From JSON bytes vector: message empty] Message decoding error"),
     };
     // Get `StreamerMessage` from received Borealis Message
@@ -532,17 +532,18 @@ fn main() {
             let stream_info = nats_connection.create_stream(StreamConfig {
                 name: "BlockIndex".to_string(),
                 discard: DiscardPolicy::Old,
-                subjects: Some(vec![format!("{}_{:?}", run_args.subject, run_args.msg_format)]),
+                subjects: Some(vec![format!("{}_{}", run_args.subject, run_args.msg_format.to_string())]),
+                duplicate_window: 86400,
                 retention: RetentionPolicy::Limits,
                 storage: StorageType::File,
                 ..Default::default()
             }).expect("IO error, something went wrong while creating a new stream, maybe stream already exist");
             let consumer = nats_connection.create_consumer("BlockIndex", ConsumerConfig {
-                deliver_subject: Some(format!("{}_{:?}", run_args.subject, run_args.msg_format)),
-                durable_name: Some(format!("Borealis_Consumer_{}_{:?}", run_args.subject, run_args.msg_format)),
+                deliver_subject: Some(format!("{}_{}", run_args.subject, run_args.msg_format.to_string())),
+                durable_name: Some(format!("Borealis_Consumer_{}_{}", run_args.subject, run_args.msg_format.to_string())),
                 deliver_policy: DeliverPolicy::Last,
                 ack_policy: AckPolicy::All,
-                filter_subject: format!("{}_{:?}", run_args.subject, run_args.msg_format),
+                filter_subject: format!("{}_{}", run_args.subject, run_args.msg_format.to_string()),
                 replay_policy: ReplayPolicy::Instant,
             //  opt_start_seq: i64,
             //  opt_start_time: Option<DateTime>,
@@ -567,7 +568,7 @@ fn main() {
                     WorkMode::Subscriber => {
                         let subscription = nats_connection
                             .subscribe(
-                                format!("{}_{:?}", run_args.subject, run_args.msg_format).as_str(),
+                                format!("{}_{}", run_args.subject, run_args.msg_format.to_string()).as_str(),
                             )
                             .expect(
                                 "Subscription error: maybe wrong or nonexistent `--subject` name",
@@ -590,11 +591,11 @@ fn main() {
                     },
                     WorkMode::Jetstream => {
                         let mut consumer = Consumer::create_or_open(nats_connection, "BlockIndex", ConsumerConfig {
-                            deliver_subject: Some(format!("{}_{:?}", run_args.subject, run_args.msg_format)),
-                            durable_name: Some(format!("Borealis_Consumer_{}_{:?}", run_args.subject, run_args.msg_format)),
+                            deliver_subject: Some(format!("{}_{}", run_args.subject, run_args.msg_format.to_string())),
+                            durable_name: Some(format!("Borealis_Consumer_{}_{}", run_args.subject, run_args.msg_format.to_string())),
                             deliver_policy: DeliverPolicy::Last,
                             ack_policy: AckPolicy::All,
-                            filter_subject: format!("{}_{:?}", run_args.subject, run_args.msg_format),
+                            filter_subject: format!("{}_{}", run_args.subject, run_args.msg_format.to_string()),
                             replay_policy: ReplayPolicy::Instant,
                         //  opt_start_seq: i64,
                         //  opt_start_time: Option<DateTime>,

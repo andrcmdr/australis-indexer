@@ -17,13 +17,13 @@ bash ./make.sh fmt
 
 bash ./make.sh check
 
-bash ./make.sh build
-
-bash ./make.sh build release
-
 bash ./make.sh submodules update
 
 bash ./make.sh submodules
+
+bash ./make.sh build release
+
+bash ./make.sh build
 ```
 
 ## **Usage help for Borealis Indexer (after buidling executables):**
