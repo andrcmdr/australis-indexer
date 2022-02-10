@@ -529,8 +529,10 @@ fn main() {
         }
         SubCommand::Init(run_args) => {
             let nats_connection = nats_connect(run_args.to_owned());
+
+            // JetStreams cannot be created from NATS Client side, but this ability is still remain
             let stream_info = nats_connection.create_stream(StreamConfig {
-                name: "BlockIndex".to_string(),
+                name: format!("{}_{}", run_args.subject, run_args.msg_format.to_string()),
                 discard: DiscardPolicy::Old,
                 subjects: Some(vec![format!("{}_{}", run_args.subject, run_args.msg_format.to_string())]),
                 duplicate_window: 86400,
@@ -538,7 +540,8 @@ fn main() {
                 storage: StorageType::File,
                 ..Default::default()
             }).expect("IO error, something went wrong while creating a new stream, maybe stream already exist");
-            let consumer = nats_connection.create_consumer("BlockIndex", ConsumerConfig {
+
+            let consumer = nats_connection.create_consumer(format!("{}_{}", run_args.subject, run_args.msg_format.to_string()).as_str(), ConsumerConfig {
                 deliver_subject: Some(format!("{}_{}", run_args.subject, run_args.msg_format.to_string())),
                 durable_name: Some(format!("Borealis_Consumer_{}_{}", run_args.subject, run_args.msg_format.to_string())),
                 deliver_policy: DeliverPolicy::Last,
@@ -549,6 +552,7 @@ fn main() {
             //  opt_start_time: Option<DateTime>,
                 ..Default::default()
             }).expect("IO error, something went wrong while creating a new consumer, maybe consumer already exist");
+
             info!(
                 target: "borealis_consumer",
                 "Initialized:\nStream:\n{:?}\nConsumer:\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}",
@@ -590,7 +594,7 @@ fn main() {
                         };
                     },
                     WorkMode::Jetstream => {
-                        let mut consumer = Consumer::create_or_open(nats_connection, "BlockIndex", ConsumerConfig {
+                        let mut consumer = Consumer::create_or_open(nats_connection, format!("{}_{}", run_args.subject, run_args.msg_format.to_string()).as_str(), ConsumerConfig {
                             deliver_subject: Some(format!("{}_{}", run_args.subject, run_args.msg_format.to_string())),
                             durable_name: Some(format!("Borealis_Consumer_{}_{}", run_args.subject, run_args.msg_format.to_string())),
                             deliver_policy: DeliverPolicy::Last,
@@ -601,6 +605,7 @@ fn main() {
                         //  opt_start_time: Option<DateTime>,
                             ..Default::default()
                         }).expect("IO error, something went wrong while creating a new consumer or returning an existent consumer");
+
                         loop {
                             info!(
                                 target: "borealis_consumer",
