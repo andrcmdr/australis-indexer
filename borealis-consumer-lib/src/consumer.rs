@@ -291,6 +291,134 @@ pub fn init(context: &Context) {
     );
 }
 
+// Create JetStream with initial stream name and consisting of exact subject names
+pub fn jetstream_create_stream(nats_connection: &nats::Connection, stream_name: String, subject_names: Option<Vec<String>>) -> StreamInfo {
+    // JetStreams cannot be created from NATS Client side due to restrictions on NATS server side, but this ability is still available in library for client side consumers
+    let stream_info = nats_connection.create_stream(StreamConfig {
+        name: stream_name,
+        discard: DiscardPolicy::Old,
+        subjects: subject_names,
+        duplicate_window: 86400,
+        retention: RetentionPolicy::Limits,
+        storage: StorageType::File,
+        ..Default::default()
+    }).expect("IO error, something went wrong while creating a new stream, maybe stream already exist");
+
+    info!(
+        target: "borealis_consumer",
+        "Initialized:\nStream:\n{:?}",
+        stream_info
+    );
+
+    stream_info
+}
+
+// Create JetStream consumer with custom parameters (see documentation descrption for the meaning of exact ConsumerConfig parameters)
+pub fn jetstream_create_consumer(nats_connection: &nats::Connection, stream_name: String, deliver_subject: Option<String>, durable_name: Option<String>, filter_subject: String) -> JetStreamConsumer {
+    let consumer = JetStreamConsumer::create_or_open(nats_connection.to_owned(), stream_name.as_str(), ConsumerConfig {
+        deliver_subject,
+        durable_name,
+        deliver_policy: DeliverPolicy::Last,
+        ack_policy: AckPolicy::Explicit,
+        filter_subject,
+        replay_policy: ReplayPolicy::Instant,
+        ..Default::default()
+    }).expect("IO error, something went wrong while creating a new consumer or returning an existent consumer");
+
+    info!(
+        target: "borealis_consumer",
+        "Initialized:\nConsumer:\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}",
+        consumer.nc,
+        consumer.stream,
+        consumer.cfg,
+        consumer.push_subscriber,
+        consumer.timeout
+    );
+
+    consumer
+}
+
+pub fn jetstream_create_consumer_from_start_seq(nats_connection: &nats::Connection, stream_name: String, deliver_subject: Option<String>, durable_name: Option<String>, filter_subject: String, start_seq: Option<i64>) -> JetStreamConsumer {
+    let consumer = JetStreamConsumer::create_or_open(nats_connection.to_owned(), stream_name.as_str(), ConsumerConfig {
+        deliver_subject,
+        durable_name,
+        deliver_policy: DeliverPolicy::ByStartSeq,
+        ack_policy: AckPolicy::Explicit,
+        filter_subject,
+        replay_policy: ReplayPolicy::Instant,
+        opt_start_seq: match start_seq {
+            Some(seq) => seq,
+            None => Default::default(),
+        },
+        ..Default::default()
+    }).expect("IO error, something went wrong while creating a new consumer or returning an existent consumer");
+
+    info!(
+        target: "borealis_consumer",
+        "Initialized:\nConsumer:\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}",
+        consumer.nc,
+        consumer.stream,
+        consumer.cfg,
+        consumer.push_subscriber,
+        consumer.timeout
+    );
+
+    consumer
+}
+
+pub fn jetstream_create_consumer_from_start_time(nats_connection: &nats::Connection, stream_name: String, deliver_subject: Option<String>, durable_name: Option<String>, filter_subject: String, start_time: Option<ChronoDateTime<Utc>>) -> JetStreamConsumer {
+    let consumer = JetStreamConsumer::create_or_open(nats_connection.to_owned(), stream_name.as_str(), ConsumerConfig {
+        deliver_subject,
+        durable_name,
+        deliver_policy: DeliverPolicy::ByStartTime,
+        ack_policy: AckPolicy::Explicit,
+        filter_subject,
+        replay_policy: ReplayPolicy::Instant,
+        opt_start_time: match start_time {
+            Some(time) => Some(DateTime(time)),
+            None => Default::default(),
+        },
+        ..Default::default()
+    }).expect("IO error, something went wrong while creating a new consumer or returning an existent consumer");
+
+    info!(
+        target: "borealis_consumer",
+        "Initialized:\nConsumer:\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}",
+        consumer.nc,
+        consumer.stream,
+        consumer.cfg,
+        consumer.push_subscriber,
+        consumer.timeout
+    );
+
+    consumer
+}
+
+// Create JetStream consumer with Context parameters (see documentation descrption for the meaning of exact Context parameters)
+pub fn jetstream_create_consumer_from_args(context: &Context, nats_connection: &nats::Connection) -> JetStreamConsumer {
+    let consumer = JetStreamConsumer::create_or_open(nats_connection.to_owned(), format!("{}_{}", context.subject, context.msg_format.to_string()).as_str(), ConsumerConfig {
+        deliver_subject: Some(format!("{}_{}", context.subject, context.msg_format.to_string())),
+        durable_name: Some(format!("Borealis_Consumer_{}_{}", context.subject, context.msg_format.to_string())),
+        deliver_policy: DeliverPolicy::Last,
+        ack_policy: AckPolicy::Explicit,
+        filter_subject: format!("{}_{}", context.subject, context.msg_format.to_string()),
+        replay_policy: ReplayPolicy::Instant,
+        ..Default::default()
+    }).expect("IO error, something went wrong while creating a new consumer or returning an existent consumer");
+
+    info!(
+        target: "borealis_consumer",
+        "Initialized:\nConsumer:\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}",
+        consumer.nc,
+        consumer.stream,
+        consumer.cfg,
+        consumer.push_subscriber,
+        consumer.timeout
+    );
+
+    consumer
+}
+
 
 /*
 nats_connect(context) -> Connection
