@@ -419,6 +419,149 @@ pub fn jetstream_create_consumer_from_args(context: &Context, nats_connection: &
     consumer
 }
 
+pub fn get_stream_names(nats_connection: &nats::Connection) {
+    nats_connection.stream_names().for_each(| stream_name | {
+        match stream_name {
+            Ok(stream_name) => {
+                info!(
+                    target: "borealis_consumer",
+                    "Stream name: {}",
+                    stream_name
+                );
+            },
+            Err(error) => {
+                info!(
+                    target: "borealis_consumer",
+                    "Error during retrieving a stream name: {}",
+                    error
+                );
+            },
+        }
+    });
+}
+
+pub fn get_streams_list(nats_connection: &nats::Connection) {
+    nats_connection.list_streams().for_each(| stream_info | {
+        match stream_info {
+            Ok(stream_info) => {
+                info!(
+                    target: "borealis_consumer",
+                    "Stream information: {:?}",
+                    stream_info
+                );
+            },
+            Err(error) => {
+                info!(
+                    target: "borealis_consumer",
+                    "Error during retrieving a stream information: {}",
+                    error
+                );
+            },
+        }
+    });
+}
+
+pub fn get_stream_info(nats_connection: &nats::Connection, stream_name: String) -> std::io::Result<StreamInfo> {
+    match nats_connection.stream_info(stream_name.as_str()) {
+        Ok(stream_info) => {
+            info!(
+                target: "borealis_consumer",
+                "Stream {} information: {:?}",
+                stream_name,
+                stream_info
+            );
+            Ok(stream_info)
+        },
+        Err(error) => {
+            info!(
+                target: "borealis_consumer",
+                "Error during retrieving a stream {} information: {}",
+                stream_name,
+                error
+            );
+            Err(error)
+        },
+    }
+}
+
+pub fn get_consumers_list(nats_connection: &nats::Connection, stream_name: String) {
+    match nats_connection.list_consumers(stream_name.as_str()) {
+        Ok(consumers_list) => {
+            consumers_list.for_each(| consumer_info | {
+                if let Ok(consumer_info) = consumer_info {
+                    info!(
+                        target: "borealis_consumer",
+                        "Consumer information for stream {}: {:?}",
+                        stream_name,
+                        consumer_info
+                    );
+                } else if let Err(error) = consumer_info {
+                    info!(
+                        target: "borealis_consumer",
+                        "Error during retrieving a consumer information for stream {}: {}",
+                        stream_name,
+                        error
+                    );
+                };
+            });
+        },
+        Err(error) => {
+            info!(
+                target: "borealis_consumer",
+                "Error during retrieving a consumer list for stream {}: {}",
+                stream_name,
+                error
+            );
+        },
+    }
+}
+
+pub fn get_consumer_info(nats_connection: &nats::Connection, stream_name: String, consumer_name: String) -> std::io::Result<ConsumerInfo> {
+    match nats_connection.consumer_info(stream_name.as_str(), consumer_name.as_str()) {
+        Ok(consumer_info) => {
+            info!(
+                target: "borealis_consumer",
+                "Consumer {} information for stream {}: {:?}",
+                consumer_name,
+                stream_name,
+                consumer_info
+            );
+            Ok(consumer_info)
+        },
+        Err(error) => {
+            info!(
+                target: "borealis_consumer",
+                "Error during retrieving a consumer {} information for stream {}: {}",
+                consumer_name,
+                stream_name,
+                error
+            );
+            Err(error)
+        },
+    }
+}
+
+pub fn get_jetstream_account_info(nats_connection: &nats::Connection) -> std::io::Result<AccountInfo> {
+    match nats_connection.account_info() {
+        Ok(account_info) => {
+            info!(
+                target: "borealis_consumer",
+                "JetStream account information: {:?}",
+                account_info
+            );
+            Ok(account_info)
+        },
+        Err(error) => {
+            info!(
+                target: "borealis_consumer",
+                "Error during retrieving a JetStream account information: {}",
+                error
+            );
+            Err(error)
+        },
+    }
+}
+
 
 /*
 nats_connect(context) -> Connection
