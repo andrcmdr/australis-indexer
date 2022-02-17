@@ -562,6 +562,28 @@ pub fn get_jetstream_account_info(nats_connection: &nats::Connection) -> std::io
     }
 }
 
+pub fn create_subscription(nats_connection: &nats::Connection, subject_name: String) -> nats::Subscription {
+    let subscription = nats_connection
+    .subscribe(
+        subject_name.as_str(),
+    )
+    .expect(
+        "Subscription error: maybe wrong or nonexistent `--subject` name",
+    );
+    subscription
+}
+
+pub fn create_subscription_from_args(context: &Context, nats_connection: &nats::Connection) -> nats::Subscription {
+    let subscription = nats_connection
+    .subscribe(
+        format!("{}_{}", context.subject, context.msg_format.to_string()).as_str(),
+    )
+    .expect(
+        "Subscription error: maybe wrong or nonexistent `--subject` name",
+    );
+    subscription
+}
+
 
 /*
 nats_connect(context) -> Connection
