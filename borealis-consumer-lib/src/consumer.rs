@@ -637,6 +637,49 @@ pub fn listen_messages(context: &Context, nats_connection: &nats::Connection) {
     }
 }
 
+pub fn handle_message(context: &Context, msg: nats::Message) {
+    info!(
+        target: "borealis_consumer",
+        "Message consumer loop executed: message received\n"
+    );
+
+    // Decoding of Borealis Message receved from NATS subject/jetstream
+    let borealis_message: BorealisMessage<StreamerMessage> = message_decode(context, msg);
+    // Get `StreamerMessage` from received Borealis Message
+    let streamer_message: StreamerMessage = borealis_message.payload;
+    message_dump(Some(VerbosityLevel::WithBlockHashHeight), streamer_message);
+}
+
+pub fn handle_streamer_message(context: &Context, msg: nats::Message) {
+    info!(
+        target: "borealis_consumer",
+        "Message consumer loop executed: message received\n"
+    );
+
+    // Get `StreamerMessage` from Borealis Message receved from NATS subject/jetstream
+    let streamer_message: StreamerMessage = message_get_payload(context, msg);
+    message_dump(Some(VerbosityLevel::WithBlockHashHeight), streamer_message);
+}
+
+pub fn message_get_payload<T: DeserializeOwned>(context: &Context, msg: nats::Message) -> T {
+    // Decoding of Borealis Message receved from NATS subject/jetstream
+    let borealis_message: BorealisMessage<T> = message_decode(context, msg);
+    // Get `StreamerMessage` from received Borealis Message
+    let payload: T = borealis_message.payload;
+    payload
+}
+
+pub fn message_decode<T: DeserializeOwned>(context: &Context, msg: nats::Message) -> BorealisMessage<T> {
+    // Decoding of Borealis Message receved from NATS subject/jetstream
+    let borealis_message: BorealisMessage<T> = match context.msg_format {
+        MsgFormat::Cbor => BorealisMessage::from_cbor(msg.data.as_ref())
+            .expect("[From CBOR bytes vector: message empty] Message decoding error"),
+        MsgFormat::Json => BorealisMessage::from_json_bytes(msg.data.as_ref())
+            .expect("[From JSON bytes vector: message empty] Message decoding error"),
+    };
+    borealis_message
+}
+
 
 /*
 nats_connect(context) -> Connection
