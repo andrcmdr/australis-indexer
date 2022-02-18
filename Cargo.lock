@@ -580,11 +580,11 @@ version = "0.1.0"
 dependencies = [
  "actix",
  "borealis-types",
- "clap",
+ "chrono",
  "nats",
  "near-indexer",
- "openssl-probe",
  "rand 0.8.4",
+ "serde",
  "serde_cbor",
  "serde_json",
  "tokio",

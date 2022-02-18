@@ -680,6 +680,136 @@ pub fn message_decode<T: DeserializeOwned>(context: &Context, msg: nats::Message
     borealis_message
 }
 
+pub fn message_dump(verbosity_level: Option<VerbosityLevel>, streamer_message: StreamerMessage) {
+
+    // Data handling from `StreamerMessage` data structure. For custom filtering purposes.
+    // Same as: jq '{block_height: .block.header.height, block_hash: .block.header.hash, block_header_chunk: .block.chunks[0], shard_chunk_header: .shards[0].chunk.header, transactions: .shards[0].chunk.transactions, receipts: .shards[0].chunk.receipts, receipt_execution_outcomes: .shards[0].receipt_execution_outcomes, state_changes: .state_changes}'
+
+    info!(
+        target: "borealis_consumer",
+        "block_height: #{}, block_hash: {}\n",
+        &streamer_message.block.header.height,
+        &streamer_message.block.header.hash
+    );
+
+    if let Some(_verbosity_level) = verbosity_level {
+        println!(
+            "block_height: #{}, block_hash: {}\n",
+            &streamer_message.block.header.height, &streamer_message.block.header.hash
+        );
+    };
+
+    if let Some(VerbosityLevel::WithStreamerMessageDump) | Some(VerbosityLevel::WithStreamerMessageParse) = verbosity_level {
+        println!(
+            "streamer_message: {}\n",
+            serde_json::to_string_pretty(&streamer_message).unwrap()
+        );
+        println!(
+            "streamer_message: {}\n",
+            serde_json::to_string(&streamer_message).unwrap()
+        );
+    };
+
+    if let Some(VerbosityLevel::WithStreamerMessageParse) = verbosity_level {
+        println!(
+            "streamer_message: {}\n",
+            serde_json::to_value(&streamer_message).unwrap()
+        );
+        println!(
+            "streamer_message: {:?}\n",
+            cbor::to_vec(&streamer_message).unwrap()
+        );
+
+        println!(
+            "block_header: {}\n",
+            serde_json::to_value(&streamer_message.block.header).unwrap()
+        );
+        println!(
+            "block_header: {:?}\n",
+            cbor::to_vec(&streamer_message.block.header).unwrap()
+        );
+
+        println!(
+            "block_header_chunks#: {}\n",
+            streamer_message.block.chunks.len()
+        );
+        streamer_message.block.chunks.iter().for_each(|chunk| {
+            println!(
+                "block_header_chunk: {}\n",
+                serde_json::to_value(&chunk).unwrap()
+            );
+            println!("block_header_chunk: {:?}\n", cbor::to_vec(&chunk).unwrap());
+        });
+
+        println!("shards#: {}\n", streamer_message.shards.len());
+        streamer_message.shards.iter().for_each(|shard| {
+            if let Some(chunk) = &shard.chunk {
+                println!(
+                    "shard_chunk_header: {}\n",
+                    serde_json::to_value(&chunk.header).unwrap()
+                );
+                println!(
+                    "shard_chunk_header: {:?}\n",
+                    cbor::to_vec(&chunk.header).unwrap()
+                );
+
+                println!("shard_chunk_transactions#: {}\n", chunk.transactions.len());
+                println!(
+                    "shard_chunk_transactions: {}\n",
+                    serde_json::to_value(&chunk.transactions).unwrap()
+                );
+                println!(
+                    "shard_chunk_transactions: {:?}\n",
+                    cbor::to_vec(&chunk.transactions).unwrap()
+                );
+
+                println!("shard_chunk_receipts#: {}\n", chunk.receipts.len());
+                println!(
+                    "shard_chunk_receipts: {}\n",
+                    serde_json::to_value(&chunk.receipts).unwrap()
+                );
+                println!(
+                    "shard_chunk_receipts: {:?}\n",
+                    cbor::to_vec(&chunk.receipts).unwrap()
+                );
+            } else {
+                println!("shard_chunk_header: None\n");
+
+                println!("shard_chunk_transactions#: None\n");
+                println!("shard_chunk_transactions: None\n");
+
+                println!("shard_chunk_receipts#: None\n");
+                println!("shard_chunk_receipts: None\n");
+            };
+
+            println!(
+                "shard_receipt_execution_outcomes#: {}\n",
+                shard.receipt_execution_outcomes.len()
+            );
+            println!(
+                "shard_receipt_execution_outcomes: {}\n",
+                serde_json::to_value(&shard.receipt_execution_outcomes).unwrap()
+            );
+            println!(
+                "shard_receipt_execution_outcomes: {:?}\n",
+                cbor::to_vec(&shard.receipt_execution_outcomes).unwrap()
+            );
+        });
+
+        println!("StateChanges#: {}\n", streamer_message.state_changes.len());
+        streamer_message
+            .state_changes
+            .iter()
+            .for_each(|state_change| {
+                println!(
+                    "StateChange: {}\n",
+                    serde_json::to_value(&state_change).unwrap()
+                );
+                println!("StateChange: {:?}\n", cbor::to_vec(&state_change).unwrap());
+            });
+    };
+}
+
 
 /*
 nats_connect(context) -> Connection
