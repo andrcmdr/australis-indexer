@@ -584,6 +584,59 @@ pub fn create_subscription_from_args(context: &Context, nats_connection: &nats::
     subscription
 }
 
+pub fn run(context: &Context) {
+    let nats_connection = nats_connect(context.to_owned());
+    let system = actix::System::new();
+    system.block_on(async move {
+        listen_messages(context, &nats_connection);
+    });
+    system.run().unwrap();
+}
+
+pub fn listen_messages(context: &Context, nats_connection: &nats::Connection) {
+    match context.work_mode {
+        WorkMode::Subscriber => {
+            let subscription = create_subscription_from_args(context, &nats_connection);
+            loop {
+                info!(
+                    target: "borealis_consumer",
+                    "Message consumer loop started: listening for new messages\n"
+                );
+                if let Ok(msg) = subscription.next_timeout(std::time::Duration::from_millis(10000)) {
+                    info!(target: "borealis_consumer", "Received message:\n{}", &msg);
+                    handle_message(context, msg);
+                } else {
+                    info!(
+                        target: "borealis_consumer",
+                        "Message wasn't received within 10s timeframe: Error occured due to waiting timeout for message receiving was elapsed\n"
+                    );
+                };
+            };
+        },
+        WorkMode::Jetstream => {
+            let mut consumer = jetstream_create_consumer_from_args(context, &nats_connection);
+            consumer.timeout = std::time::Duration::from_millis(10000);
+            loop {
+                info!(
+                    target: "borealis_consumer",
+                    "Message JetStream consumer loop started: listening for new messages\n"
+                );
+                if let Ok(message) = consumer.process_timeout(|msg| {
+                    info!(target: "borealis_consumer", "Received message:\n{}", msg);
+                    Ok(msg.to_owned())
+                }) {
+                    handle_message(context, message);
+                } else {
+                    info!(
+                        target: "borealis_consumer",
+                        "Message wasn't received within 10s timeframe: Error occured due to waiting timeout for message receiving was elapsed\n"
+                    );
+                };
+            };
+        },
+    }
+}
+
 
 /*
 nats_connect(context) -> Connection
