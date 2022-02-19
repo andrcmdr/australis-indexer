@@ -31,16 +31,16 @@ pub struct Context {
     pub creds_path: Option<std::path::PathBuf>,
     /// Borealis Bus (NATS based MOM/MQ/SOA service bus) protocol://address:port
     /// Example: "nats://borealis.aurora.dev:4222" or "tls://borealis.aurora.dev:4443" for TLS connection
-//  default_value = "tls://westcoast.nats.backend.aurora.dev:4222,tls://eastcoast.nats.backend.aurora.dev:4222"
+    ///  default_value = "tls://westcoast.nats.backend.aurora.dev:4222,tls://eastcoast.nats.backend.aurora.dev:4222"
     pub nats_server: String,
     /// Consumer work mode (standard `Subscriber` or `JetStream` subscriber)
-//  default_value = "JetStream"
+    ///  default_value = "JetStream"
     pub work_mode: WorkMode,
     /// Consumer subject, for subscription and to take messages from
-//  default_value = "BlockIndex_StreamerMessages"
+    ///  default_value = "BlockIndex_StreamerMessages"
     pub subject: String,
     /// Consuming messages format (`CBOR` or `JSON`), suffix for subject name
-//  default_value = "CBOR"
+    ///  default_value = "CBOR"
     pub msg_format: MsgFormat,
 }
 
@@ -273,7 +273,7 @@ pub fn nats_check_connection(nats_connection: &nats::Connection) {
     info!(target: "borealis_consumer", "maximum payload size the current NATS server will accept: {:?}", nats_connection.max_payload());
 }
 
-// Initialization for JetStream consumers
+/// Initialization for JetStream consumers
 pub fn init(context: &Context) {
     let nats_connection = nats_connect(context.to_owned());
     let stream_info = jetstream_create_stream(&nats_connection, format!("{}_{}", context.subject, context.msg_format.to_string()), Some(vec![format!("{}_{}", context.subject, context.msg_format.to_string())]));
@@ -291,7 +291,7 @@ pub fn init(context: &Context) {
     );
 }
 
-// Create JetStream with initial stream name and consisting of exact subject names
+/// Create JetStream with initial stream name and consisting of exact subject names
 pub fn jetstream_create_stream(nats_connection: &nats::Connection, stream_name: String, subject_names: Option<Vec<String>>) -> StreamInfo {
     // JetStreams cannot be created from NATS Client side due to restrictions on NATS server side, but this ability is still available in library for client side consumers
     let stream_info = nats_connection.create_stream(StreamConfig {
@@ -313,7 +313,8 @@ pub fn jetstream_create_stream(nats_connection: &nats::Connection, stream_name: 
     stream_info
 }
 
-// Create JetStream consumer with custom parameters (see documentation descrption for the meaning of exact ConsumerConfig parameters)
+/// Create JetStream consumer with custom parameters
+/// (see NATS documentation descrption for the meaning of particular ConsumerConfig parameters)
 pub fn jetstream_create_consumer(nats_connection: &nats::Connection, stream_name: String, deliver_subject: Option<String>, durable_name: Option<String>, filter_subject: String) -> JetStreamConsumer {
     let consumer = JetStreamConsumer::create_or_open(nats_connection.to_owned(), stream_name.as_str(), ConsumerConfig {
         deliver_subject,
@@ -338,6 +339,7 @@ pub fn jetstream_create_consumer(nats_connection: &nats::Connection, stream_name
     consumer
 }
 
+/// Create JetStream consumer to consume messages after message with exact sequential number
 pub fn jetstream_create_consumer_from_start_seq(nats_connection: &nats::Connection, stream_name: String, deliver_subject: Option<String>, durable_name: Option<String>, filter_subject: String, start_seq: Option<i64>) -> JetStreamConsumer {
     let consumer = JetStreamConsumer::create_or_open(nats_connection.to_owned(), stream_name.as_str(), ConsumerConfig {
         deliver_subject,
@@ -366,6 +368,7 @@ pub fn jetstream_create_consumer_from_start_seq(nats_connection: &nats::Connecti
     consumer
 }
 
+/// Create JetStream consumer to consume messages after message with exact timestamp
 pub fn jetstream_create_consumer_from_start_time(nats_connection: &nats::Connection, stream_name: String, deliver_subject: Option<String>, durable_name: Option<String>, filter_subject: String, start_time: Option<ChronoDateTime<Utc>>) -> JetStreamConsumer {
     let consumer = JetStreamConsumer::create_or_open(nats_connection.to_owned(), stream_name.as_str(), ConsumerConfig {
         deliver_subject,
@@ -394,7 +397,8 @@ pub fn jetstream_create_consumer_from_start_time(nats_connection: &nats::Connect
     consumer
 }
 
-// Create JetStream consumer with Context parameters (see documentation descrption for the meaning of exact Context parameters)
+/// Create JetStream consumer from Context parameters
+/// (see documentation descrption for the meaning of particular Context and ConsumerConfig parameters)
 pub fn jetstream_create_consumer_from_args(context: &Context, nats_connection: &nats::Connection) -> JetStreamConsumer {
     let consumer = JetStreamConsumer::create_or_open(nats_connection.to_owned(), format!("{}_{}", context.subject, context.msg_format.to_string()).as_str(), ConsumerConfig {
         deliver_subject: Some(format!("{}_{}", context.subject, context.msg_format.to_string())),
@@ -419,6 +423,7 @@ pub fn jetstream_create_consumer_from_args(context: &Context, nats_connection: &
     consumer
 }
 
+/// Get names for all JetStream streams from NATS server
 pub fn get_stream_names(nats_connection: &nats::Connection) {
     nats_connection.stream_names().for_each(| stream_name | {
         match stream_name {
@@ -440,6 +445,7 @@ pub fn get_stream_names(nats_connection: &nats::Connection) {
     });
 }
 
+/// Get full information about all JetStream streams from NATS server
 pub fn get_streams_list(nats_connection: &nats::Connection) {
     nats_connection.list_streams().for_each(| stream_info | {
         match stream_info {
@@ -461,6 +467,7 @@ pub fn get_streams_list(nats_connection: &nats::Connection) {
     });
 }
 
+/// Get full information about particular JetStream stream from NATS server
 pub fn get_stream_info(nats_connection: &nats::Connection, stream_name: String) -> std::io::Result<StreamInfo> {
     match nats_connection.stream_info(stream_name.as_str()) {
         Ok(stream_info) => {
@@ -484,6 +491,7 @@ pub fn get_stream_info(nats_connection: &nats::Connection, stream_name: String) 
     }
 }
 
+/// Get full information about all JetStream consumers created for particular stream from NATS server
 pub fn get_consumers_list(nats_connection: &nats::Connection, stream_name: String) {
     match nats_connection.list_consumers(stream_name.as_str()) {
         Ok(consumers_list) => {
@@ -516,6 +524,7 @@ pub fn get_consumers_list(nats_connection: &nats::Connection, stream_name: Strin
     }
 }
 
+/// Get full information about certain JetStream consumer created for particular stream from NATS server
 pub fn get_consumer_info(nats_connection: &nats::Connection, stream_name: String, consumer_name: String) -> std::io::Result<ConsumerInfo> {
     match nats_connection.consumer_info(stream_name.as_str(), consumer_name.as_str()) {
         Ok(consumer_info) => {
@@ -541,6 +550,7 @@ pub fn get_consumer_info(nats_connection: &nats::Connection, stream_name: String
     }
 }
 
+/// Get full information about JetStream client account from NATS server
 pub fn get_jetstream_account_info(nats_connection: &nats::Connection) -> std::io::Result<AccountInfo> {
     match nats_connection.account_info() {
         Ok(account_info) => {
@@ -562,6 +572,7 @@ pub fn get_jetstream_account_info(nats_connection: &nats::Connection) -> std::io
     }
 }
 
+/// Create subscription to NATS subject
 pub fn create_subscription(nats_connection: &nats::Connection, subject_name: String) -> nats::Subscription {
     let subscription = nats_connection
     .subscribe(
@@ -573,6 +584,8 @@ pub fn create_subscription(nats_connection: &nats::Connection, subject_name: Str
     subscription
 }
 
+/// Create subscription to NATS subject from Context parameters
+/// (see documentation descrption for the meaning of particular Context parameters)
 pub fn create_subscription_from_args(context: &Context, nats_connection: &nats::Connection) -> nats::Subscription {
     let subscription = nats_connection
     .subscribe(
@@ -584,6 +597,7 @@ pub fn create_subscription_from_args(context: &Context, nats_connection: &nats::
     subscription
 }
 
+/// Run Borealis Consumer with messages listener for Borealis NATS Bus
 pub fn run(context: &Context) {
     let nats_connection = nats_connect(context.to_owned());
     let system = actix::System::new();
@@ -593,6 +607,7 @@ pub fn run(context: &Context) {
     system.run().unwrap();
 }
 
+/// Listen NATS messages from particular subject subscription or from JetStream stream with parameters set in Context type
 pub fn listen_messages(context: &Context, nats_connection: &nats::Connection) {
     match context.work_mode {
         WorkMode::Subscriber => {
@@ -637,6 +652,7 @@ pub fn listen_messages(context: &Context, nats_connection: &nats::Connection) {
     }
 }
 
+/// Handle received NATS message (decode, extract `StreamerMessage` as payload, dump information from `StreamerMessage`)
 pub fn handle_message(context: &Context, msg: nats::Message) {
     info!(
         target: "borealis_consumer",
@@ -650,6 +666,7 @@ pub fn handle_message(context: &Context, msg: nats::Message) {
     message_dump(Some(VerbosityLevel::WithBlockHashHeight), streamer_message);
 }
 
+/// Handle received NATS message (with decoding and extraction of `StreamerMessage` as payload, dump information from `StreamerMessage`)
 pub fn handle_streamer_message(context: &Context, msg: nats::Message) {
     info!(
         target: "borealis_consumer",
@@ -661,6 +678,7 @@ pub fn handle_streamer_message(context: &Context, msg: nats::Message) {
     message_dump(Some(VerbosityLevel::WithBlockHashHeight), streamer_message);
 }
 
+/// Extract `StreamerMessage` as payload from received NATS message
 pub fn message_get_payload<T: DeserializeOwned>(context: &Context, msg: nats::Message) -> T {
     // Decoding of Borealis Message receved from NATS subject/jetstream
     let borealis_message: BorealisMessage<T> = message_decode(context, msg);
@@ -669,6 +687,7 @@ pub fn message_get_payload<T: DeserializeOwned>(context: &Context, msg: nats::Me
     payload
 }
 
+/// Decode received NATS message from CBOR (of JSON)
 pub fn message_decode<T: DeserializeOwned>(context: &Context, msg: nats::Message) -> BorealisMessage<T> {
     // Decoding of Borealis Message receved from NATS subject/jetstream
     let borealis_message: BorealisMessage<T> = match context.msg_format {
@@ -680,6 +699,7 @@ pub fn message_decode<T: DeserializeOwned>(context: &Context, msg: nats::Message
     borealis_message
 }
 
+/// Dump information from `StreamerMessage` payload, extracted from received NATS message
 pub fn message_dump(verbosity_level: Option<VerbosityLevel>, streamer_message: StreamerMessage) {
 
     // Data handling from `StreamerMessage` data structure. For custom filtering purposes.
@@ -809,43 +829,4 @@ pub fn message_dump(verbosity_level: Option<VerbosityLevel>, streamer_message: S
             });
     };
 }
-
-
-/*
-nats_connect(context) -> Connection
-nats_check_connection(context):
-let nc = nats::connect("demo.nats.io")?;
-let nats_connection = nats_connect(context);
-https://docs.rs/nats/0.16.0/nats/struct.Connection.html#method.rtt
-println!("server rtt: {:?}", nc.rtt());
-https://docs.rs/nats/0.16.0/nats/struct.Connection.html#method.client_ip
-println!("ip: {:?}", nc.client_ip());
-https://docs.rs/nats/0.16.0/nats/struct.Connection.html#method.client_id
-println!("id: {:?}", nc.client_id());
-https://docs.rs/nats/0.16.0/nats/struct.Connection.html#method.max_payload
-println!("max payload: {:?}", nc.max_payload());
-
-consumer_init(context(stream, subject, msg_format))
-https://docs.rs/nats/0.16.0/nats/struct.Connection.html#method.stream_names
-https://docs.rs/nats/0.16.0/nats/struct.Connection.html#method.list_streams
-https://docs.rs/nats/0.16.0/nats/struct.Connection.html#method.stream_info
-https://docs.rs/nats/0.16.0/nats/struct.Connection.html#method.list_consumers
-https://docs.rs/nats/0.16.0/nats/struct.Connection.html#method.consumer_info
-https://docs.rs/nats/0.16.0/nats/struct.Connection.html#method.account_info
-jetstream_create_stream(stream_name, subjects[subject, msg_format])
-jetstream_create_consumer(stream, subject, msg_format)
-jetstream_create_consumer_from_start_seq(stream, subject, msg_format, start_seq)
-jetstream_create_consumer_from_start_time(stream, subject, msg_format, start_time)
-jetstream_create_consumer_from_args(stream, subject, msg_format)
-jetstream_consumer_create_or_open(stream, subject, msg_format) -> nats::jetstream::Consumer
-consumer_subscribe(subject, msg_format) -> subscription
-consumer_run(work_mode, subject, msg_format)
-
-message_consumer(subscription, msg_format)
-message_jetstream_consumer(consumer, msg_format)
-message_decode(msg, msg_format) -> RawEvent, Headers, StreamerMessage
-
-message_dump/message_print(StreamerMessage)
-message_log(StreamerMessage)
-*/
 

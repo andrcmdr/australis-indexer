@@ -500,7 +500,7 @@ where Self: Send + Sync + Sized + Clone + ToOwned {
         .expect(format!("[Message as {} encoded bytes vector] Message passing error", self.msg_format().to_string()).as_str());
     }
 
-    ///Run Borealis Indexer as Borealis NATS Bus Producer
+    /// Run Borealis Indexer as Borealis NATS Bus Producer
     fn run(&self, home_path: Option<std::path::PathBuf>) {
         // let home_dir = home_path.unwrap_or(std::path::PathBuf::from(near_indexer::get_default_home()));
         let home_dir = home_path
