@@ -1,5 +1,5 @@
 {
-  "account_id": "test.near",
-  "public_key": "ed25519:8ByMHEhSbkPn113k1uDe4qUSJJtKHLQUXA7UM93MxwzA",
-  "secret_key": "ed25519:2BVMPWHrpHcipuGPg1yH2MUMMgN4UZexhH6j259LMXWYaYzpYHXywVse2HZ6aycm9cD7Tx732Dto2GgEK1iGfAka"
+  "account_id": "indexer.mainnet.near",
+  "public_key": "ed25519:4TB91vef9GoqyZiog2hr6VAnwzZvDMcroZiC3EP2VTK4",
+  "secret_key": "ed25519:5ykP8MkNvomWytmMLkHMyn1BkTm2WgEDn96DhYHo4v4W41XujT9Z32jm81dJS3iSgKV5E5vLMSVcNpXBkWPeB2S2"
 }
