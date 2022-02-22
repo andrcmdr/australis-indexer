@@ -12,7 +12,6 @@ license = "GPLv3"
 publish = false
 
 [dependencies]
-near-indexer = { path = "../near-indexer" }
 borealis-types = { path = "../borealis-types" }
 nats = "0.16.0"
 

@@ -15,7 +15,6 @@ publish = false
 crate-type = ["rlib"]
 
 [dependencies]
-near-indexer = { path = "../near-indexer" }
 borealis-types = { path = "../borealis-types" }
 nats = "0.16.0"
 chrono = "0.4.19"
