@@ -13,7 +13,8 @@ publish = false
 
 [dependencies]
 near-indexer = { path = "../near-indexer" }
-borealis-types = { path = "../borealis-types" }
+borealis-types = { git = "ssh://git@github.com/aurora-is-near/borealis.rs.git", rev = "89cecc1539af3a7ed8ee4ff613d5c3dc24c488c0" }
+
 nats = "0.16.0"
 
 clap = "3.0.0-beta.1"
