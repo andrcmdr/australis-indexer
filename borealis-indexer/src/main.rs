@@ -2,7 +2,7 @@ use actix;
 use borealis_types::prelude::BorealisMessage;
 use clap::Clap;
 use configs::{
-    init_logging, AwaitSynced, MsgFormat, Opts, RunArgs, SubCommand, SyncMode, VerbosityLevel,
+    init_logging, AwaitSynced, MsgFormat, Opts, RunArgs, SubCommand, SyncMode, VerbosityLevel, Error,
 };
 use nats;
 use near_indexer;
@@ -11,11 +11,13 @@ use serde_json;
 use tokio::sync::mpsc;
 use tracing::info;
 
+use core::cell::RefCell;
+
 pub mod configs;
 
 async fn message_producer(
     mut events_stream: mpsc::Receiver<near_indexer::StreamerMessage>,
-    nc: nats::Connection,
+    nats_connection: nats::Connection,
     subject: String,
     msg_format: MsgFormat,
     verbosity_level: Option<VerbosityLevel>,
@@ -266,7 +268,7 @@ async fn message_producer(
         // Stream message to NATS
         match msg_format {
             MsgFormat::Cbor => {
-                nc.publish(
+                nats_connection.publish(
                     format!("{}_{}", subject, msg_format.to_string()).as_str(),
                     BorealisMessage::new(streamer_message.block.header.height, &streamer_message)
                         .to_cbor(),
@@ -274,7 +276,7 @@ async fn message_producer(
                 .expect("[CBOR bytes vector] Message passing error");
             }
             MsgFormat::Json => {
-                nc.publish(
+                nats_connection.publish(
                     format!("{}_{}", subject, msg_format.to_string()).as_str(),
                     BorealisMessage::new(streamer_message.block.header.height, &streamer_message)
                         .to_json_bytes(),
@@ -414,143 +416,191 @@ async fn message_producer(
     }
 }
 
-/// Create connection to Borealis NATS Bus
-fn nats_connect(connect_args: RunArgs) -> nats::Connection {
-    let creds_path = connect_args
-        .creds_path
-        .unwrap_or(std::path::PathBuf::from("./.nats/seed/nats.creds"));
-
-    let options = match (
-        connect_args.root_cert_path,
-        connect_args.client_cert_path,
-        connect_args.client_private_key,
-    ) {
-        (Some(root_cert_path), None, None) => {
-            nats::Options::with_credentials(creds_path)
-                .with_name("Borealis Indexer [TLS, Server Auth]")
-                .tls_required(true)
-                .add_root_certificate(root_cert_path)
-                .reconnect_buffer_size(1024 * 1024 * 1024)
-                .max_reconnects(100000)
-                .reconnect_callback(
-                    || info!(target: "borealis_indexer", "connection has been reestablished"),
-                )
-                .reconnect_delay_callback(|reconnect_try| {
-                    let reconnect_attempt = {
-                        if reconnect_try == 0 {
-                            1 as usize
-                        } else {
-                            reconnect_try
-                        }
-                    };
-                    let delay = core::time::Duration::from_millis(std::cmp::min(
-                        (reconnect_attempt
-                            * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
-                            as u64,
-                        1000,
-                    ));
-                    info!(
-                        target: "borealis_indexer",
-                        "reconnection attempt #{} within delay of {:?} ...",
-                        reconnect_attempt, delay
-                    );
-                    delay
-                })
-                .disconnect_callback(
-                    || info!(target: "borealis_indexer", "connection has been lost"),
-                ) // todo: re-run message producer
-                .close_callback(|| info!(target: "borealis_indexer", "connection has been closed"))
-            // todo: re-run message producer
-        }
-        (Some(root_cert_path), Some(client_cert_path), Some(client_private_key)) => {
-            nats::Options::with_credentials(creds_path)
-                .with_name("Borealis Indexer [TLS, Server Auth, Client Auth]")
-                .tls_required(true)
-                .add_root_certificate(root_cert_path)
-                .client_cert(client_cert_path, client_private_key)
-                .reconnect_buffer_size(1024 * 1024 * 1024)
-                .max_reconnects(100000)
-                .reconnect_callback(
-                    || info!(target: "borealis_indexer", "connection has been reestablished"),
-                )
-                .reconnect_delay_callback(|reconnect_try| {
-                    let reconnect_attempt = {
-                        if reconnect_try == 0 {
-                            1 as usize
-                        } else {
-                            reconnect_try
-                        }
-                    };
-                    let delay = core::time::Duration::from_millis(std::cmp::min(
-                        (reconnect_attempt
-                            * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
-                            as u64,
-                        1000,
-                    ));
-                    info!(
-                        target: "borealis_indexer",
-                        "reconnection attempt #{} within delay of {:?} ...",
-                        reconnect_attempt, delay
-                    );
-                    delay
-                })
-                .disconnect_callback(
-                    || info!(target: "borealis_indexer", "connection has been lost"),
-                ) // todo: re-run message producer
-                .close_callback(|| info!(target: "borealis_indexer", "connection has been closed"))
-            // todo: re-run message producer
-        }
-        _ => {
-            nats::Options::with_credentials(creds_path)
-                .with_name("Borealis Indexer [NATS, without TLS]")
-                .reconnect_buffer_size(1024 * 1024 * 1024)
-                .max_reconnects(100000)
-                .reconnect_callback(
-                    || info!(target: "borealis_indexer", "connection has been reestablished"),
-                )
-                .reconnect_delay_callback(|reconnect_try| {
-                    let reconnect_attempt = {
-                        if reconnect_try == 0 {
-                            1 as usize
-                        } else {
-                            reconnect_try
-                        }
-                    };
-                    let delay = core::time::Duration::from_millis(std::cmp::min(
-                        (reconnect_attempt
-                            * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
-                            as u64,
-                        1000,
-                    ));
-                    info!(
-                        target: "borealis_indexer",
-                        "reconnection attempt #{} within delay of {:?} ...",
-                        reconnect_attempt, delay
-                    );
-                    delay
-                })
-                .disconnect_callback(
-                    || info!(target: "borealis_indexer", "connection has been lost"),
-                ) // todo: re-run message producer
-                .close_callback(|| info!(target: "borealis_indexer", "connection has been closed"))
-            // todo: re-run message producer
-        }
-    };
-
-    let nats_connection = options
-        .connect(connect_args.nats_server.as_str())
-        .expect("NATS connection error or wrong credentials");
-
-    nats_connection
+#[derive(Debug, Clone)]
+struct NATSConnection {
+    connection: Option<nats::Connection>,
 }
 
-/// Check connection to Borealis NATS Bus
-fn nats_check_connection(nats_connection: nats::Connection) {
-    //  info!(target: "borealis_indexer", "NATS Connection: {:?}", nats_connection);
-    info!(target: "borealis_indexer", "round trip time (rtt) between this client and the current NATS server: {:?}", nats_connection.rtt());
-    info!(target: "borealis_indexer", "this client IP address, as known by the current NATS server: {:?}", nats_connection.client_ip());
-    info!(target: "borealis_indexer", "this client ID, as known by the current NATS server: {:?}", nats_connection.client_id());
-    info!(target: "borealis_indexer", "maximum payload size the current NATS server will accept: {:?}", nats_connection.max_payload());
+impl NATSConnection
+    where
+        Self: Send + Sync + 'static,
+{
+    fn new() -> NATSConnection {
+        NATSConnection {
+            connection: None,
+        }
+    }
+
+    /// Create options for connection to Borealis NATS Bus
+    fn options(nc: RefCell<NATSConnection>, connect_args: RunArgs) -> nats::Options {
+        let creds_path = connect_args
+            .creds_path
+            .unwrap_or(std::path::PathBuf::from("./.nats/seed/nats.creds"));
+
+        let options = match (
+            connect_args.root_cert_path,
+            connect_args.client_cert_path,
+            connect_args.client_private_key,
+        ) {
+            (Some(root_cert_path), None, None) => {
+                nats::Options::with_credentials(creds_path)
+                    .with_name("Borealis Indexer [TLS, Server Auth]")
+                    .tls_required(true)
+                    .add_root_certificate(root_cert_path)
+                    .reconnect_buffer_size(1024 * 1024 * 1024)
+                    .max_reconnects(100000)
+                    .reconnect_delay_callback(|reconnect_try| {
+                        let reconnect_attempt = {
+                            if reconnect_try == 0 {
+                                1 as usize
+                            } else {
+                                reconnect_try
+                            }
+                        };
+                        let delay = core::time::Duration::from_millis(std::cmp::min(
+                            (reconnect_attempt
+                                * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
+                                as u64,
+                            1000,
+                        ));
+                        info!(
+                            target: "borealis_indexer",
+                            "reconnection attempt #{} within delay of {:?} ...",
+                            reconnect_attempt, delay
+                        );
+                        delay
+                    })
+                    .reconnect_callback( || {
+                        info!(target: "borealis_indexer", "connection has been reestablished");
+                        NATSConnection::try_connect(nc.to_owned(), connect_args.to_owned()).unwrap();
+                    })
+                    .disconnect_callback( || {
+                        info!(target: "borealis_indexer", "connection has been lost");
+                        NATSConnection::try_connect(nc.to_owned(), connect_args.to_owned()).unwrap();
+                    })
+                    .close_callback(|| {
+                        info!(target: "borealis_indexer", "connection has been closed");
+                        NATSConnection::try_connect(nc.to_owned(), connect_args.to_owned()).unwrap();
+                    })
+            }
+            (Some(root_cert_path), Some(client_cert_path), Some(client_private_key)) => {
+                nats::Options::with_credentials(creds_path)
+                    .with_name("Borealis Indexer [TLS, Server Auth, Client Auth]")
+                    .tls_required(true)
+                    .add_root_certificate(root_cert_path)
+                    .client_cert(client_cert_path, client_private_key)
+                    .reconnect_buffer_size(1024 * 1024 * 1024)
+                    .max_reconnects(100000)
+                    .reconnect_delay_callback(|reconnect_try| {
+                        let reconnect_attempt = {
+                            if reconnect_try == 0 {
+                                1 as usize
+                            } else {
+                                reconnect_try
+                            }
+                        };
+                        let delay = core::time::Duration::from_millis(std::cmp::min(
+                            (reconnect_attempt
+                                * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
+                                as u64,
+                            1000,
+                        ));
+                        info!(
+                            target: "borealis_indexer",
+                            "reconnection attempt #{} within delay of {:?} ...",
+                            reconnect_attempt, delay
+                        );
+                        delay
+                    })
+                    .reconnect_callback( || {
+                        info!(target: "borealis_indexer", "connection has been reestablished");
+                        NATSConnection::try_connect(nc.to_owned(), connect_args.to_owned()).unwrap();
+                    })
+                    .disconnect_callback( || {
+                        info!(target: "borealis_indexer", "connection has been lost");
+                        NATSConnection::try_connect(nc.to_owned(), connect_args.to_owned()).unwrap();
+                    })
+                    .close_callback(|| {
+                        info!(target: "borealis_indexer", "connection has been closed");
+                        NATSConnection::try_connect(nc.to_owned(), connect_args.to_owned()).unwrap();
+                    })
+           }
+            _ => {
+                nats::Options::with_credentials(creds_path)
+                    .with_name("Borealis Indexer [NATS, without TLS]")
+                    .reconnect_buffer_size(1024 * 1024 * 1024)
+                    .max_reconnects(100000)
+                    .reconnect_delay_callback(|reconnect_try| {
+                        let reconnect_attempt = {
+                            if reconnect_try == 0 {
+                                1 as usize
+                            } else {
+                                reconnect_try
+                            }
+                        };
+                        let delay = core::time::Duration::from_millis(std::cmp::min(
+                            (reconnect_attempt
+                                * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
+                                as u64,
+                            1000,
+                        ));
+                        info!(
+                            target: "borealis_indexer",
+                            "reconnection attempt #{} within delay of {:?} ...",
+                            reconnect_attempt, delay
+                        );
+                        delay
+                    })
+                    .reconnect_callback( || {
+                        info!(target: "borealis_indexer", "connection has been reestablished");
+                        NATSConnection::try_connect(nc.to_owned(), connect_args.to_owned()).unwrap();
+                    })
+                    .disconnect_callback( || {
+                        info!(target: "borealis_indexer", "connection has been lost");
+                        NATSConnection::try_connect(nc.to_owned(), connect_args.to_owned()).unwrap();
+                    })
+                    .close_callback(|| {
+                        info!(target: "borealis_indexer", "connection has been closed");
+                        NATSConnection::try_connect(nc.to_owned(), connect_args.to_owned()).unwrap();
+                    })
+           }
+        };
+        options
+    }
+
+    /// Create connection to Borealis NATS Bus
+    fn connect(nc: RefCell<NATSConnection>, connect_args: RunArgs) -> Result<RefCell<Self>, Error> {
+        let options = NATSConnection::options(nc.to_owned(), connect_args.to_owned());
+        if let Ok(nats_connection) = options.connect(connect_args.nats_server.as_str()) {
+            return Ok(RefCell::new(Self { connection: Some(nats_connection) }))
+        } else {
+            Err("NATS connection error or wrong credentials".to_string().into())
+        }
+    }
+
+    /// Use already existed connection to Borealis NATS Bus or recreate new connection to prevent connection issues
+    fn try_connect(nc: RefCell<NATSConnection>, connect_args: RunArgs) -> Result<RefCell<Self>, Error> {
+        let options = NATSConnection::options(nc.to_owned(), connect_args.to_owned());
+        if let Ok(rtt_duration) = nc.to_owned().into_inner().connection.unwrap().rtt() {
+            //  info!(target: "borealis_indexer", "NATS Connection: {:?}", self.0);
+            info!(target: "borealis_indexer", "round trip time (rtt) between this client and the current NATS server: {:?}", rtt_duration);
+            return Ok(RefCell::new(Self { connection: nc.into_inner().connection }))
+        } else if let Ok(nats_connection) = options.connect(connect_args.nats_server.as_str()) {
+            return Ok(RefCell::new(Self { connection: Some(nats_connection) }))
+        } else {
+            Err("NATS connection error or wrong credentials".to_string().into())
+        }
+    }
+
+    /// Check connection to Borealis NATS Bus
+    fn nats_check_connection(nc: RefCell<NATSConnection>) {
+        let nats_connection = nc.into_inner().connection.unwrap();
+        //  info!(target: "borealis_indexer", "NATS Connection: {:?}", self.0);
+        info!(target: "borealis_indexer", "round trip time (rtt) between this client and the current NATS server: {:?}", nats_connection.rtt());
+        info!(target: "borealis_indexer", "this client IP address, as known by the current NATS server: {:?}", nats_connection.client_ip());
+        info!(target: "borealis_indexer", "this client ID, as known by the current NATS server: {:?}", nats_connection.client_id());
+        info!(target: "borealis_indexer", "maximum payload size the current NATS server will accept: {:?}", nats_connection.max_payload());
+    }
 }
 
 fn main() {
@@ -569,10 +619,13 @@ fn main() {
         .home_dir
         .unwrap_or(std::path::PathBuf::from("./.borealis-indexer"));
 
+    let nats_connection_initial = RefCell::new(NATSConnection::new());
+
     match opts.subcmd {
         SubCommand::Check(run_args) => {
-            let nats_connection = nats_connect(run_args);
-            nats_check_connection(nats_connection.to_owned());
+            let nats_connection = NATSConnection::connect(nats_connection_initial, run_args.to_owned()).unwrap();
+            let nc = NATSConnection::try_connect(nats_connection, run_args.to_owned()).unwrap();
+            NATSConnection::nats_check_connection(nc);
         }
         SubCommand::Init(config_args) => {
             near_indexer::indexer_init_configs(&home_dir, config_args.into())
@@ -600,7 +653,8 @@ fn main() {
                 },
             };
 
-            let nats_connection = nats_connect(run_args.to_owned());
+            let nats_connection = NATSConnection::connect(nats_connection_initial, run_args.to_owned()).unwrap();
+            let nc = NATSConnection::try_connect(nats_connection, run_args.to_owned()).unwrap();
 
             let system = actix::System::new();
             system.block_on(async move {
@@ -609,7 +663,7 @@ fn main() {
                 let events_stream = indexer.streamer();
                 actix::spawn(message_producer(
                     events_stream,
-                    nats_connection,
+                    nc.into_inner().connection.unwrap(),
                     run_args.subject,
                     run_args.msg_format,
                     opts.verbose,
