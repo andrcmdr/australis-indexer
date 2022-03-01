@@ -8,10 +8,9 @@ use nats;
 use near_indexer;
 use serde_cbor as cbor;
 use serde_json;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, broadcast};
+use tokio::runtime::Runtime;
 use tracing::info;
-
-use core::cell::RefCell;
 
 pub mod configs;
 
@@ -417,6 +416,13 @@ async fn message_producer(
 }
 
 #[derive(Debug, Clone)]
+enum ConnectionEvent {
+    ConnectionReestablished,
+    ConnectionLost,
+    ConnectionClosed,
+}
+
+#[derive(Debug, Clone)]
 struct NATSConnection {
     connection: Option<nats::Connection>,
 }
@@ -432,7 +438,11 @@ impl NATSConnection
     }
 
     /// Create options for connection to Borealis NATS Bus
-    fn options(nc: RefCell<NATSConnection>, connect_args: RunArgs) -> nats::Options {
+    fn options(self, connect_args: RunArgs, connection_event_tx: mpsc::Sender<ConnectionEvent>) -> nats::Options {
+        let connection_reestablished_event = connection_event_tx.clone();
+        let connection_lost_event = connection_event_tx.clone();
+        let connection_closed_event = connection_event_tx.clone();
+        
         let creds_path = connect_args
             .creds_path
             .unwrap_or(std::path::PathBuf::from("./.nats/seed/nats.creds"));
@@ -470,17 +480,17 @@ impl NATSConnection
                         );
                         delay
                     })
-                    .reconnect_callback( || {
+                    .reconnect_callback( move || {
                         info!(target: "borealis_indexer", "connection has been reestablished");
-                        NATSConnection::try_connect(nc.to_owned(), connect_args.to_owned()).unwrap();
+                        connection_reestablished_event.blocking_send(ConnectionEvent::ConnectionReestablished).unwrap();
                     })
-                    .disconnect_callback( || {
+                    .disconnect_callback( move || {
                         info!(target: "borealis_indexer", "connection has been lost");
-                        NATSConnection::try_connect(nc.to_owned(), connect_args.to_owned()).unwrap();
+                        connection_lost_event.blocking_send(ConnectionEvent::ConnectionLost).unwrap();
                     })
-                    .close_callback(|| {
+                    .close_callback(move || {
                         info!(target: "borealis_indexer", "connection has been closed");
-                        NATSConnection::try_connect(nc.to_owned(), connect_args.to_owned()).unwrap();
+                        connection_closed_event.blocking_send(ConnectionEvent::ConnectionClosed).unwrap();
                     })
             }
             (Some(root_cert_path), Some(client_cert_path), Some(client_private_key)) => {
@@ -512,17 +522,17 @@ impl NATSConnection
                         );
                         delay
                     })
-                    .reconnect_callback( || {
+                    .reconnect_callback( move || {
                         info!(target: "borealis_indexer", "connection has been reestablished");
-                        NATSConnection::try_connect(nc.to_owned(), connect_args.to_owned()).unwrap();
+                        connection_reestablished_event.blocking_send(ConnectionEvent::ConnectionReestablished).unwrap();
                     })
-                    .disconnect_callback( || {
+                    .disconnect_callback( move || {
                         info!(target: "borealis_indexer", "connection has been lost");
-                        NATSConnection::try_connect(nc.to_owned(), connect_args.to_owned()).unwrap();
+                        connection_lost_event.blocking_send(ConnectionEvent::ConnectionLost).unwrap();
                     })
-                    .close_callback(|| {
+                    .close_callback(move || {
                         info!(target: "borealis_indexer", "connection has been closed");
-                        NATSConnection::try_connect(nc.to_owned(), connect_args.to_owned()).unwrap();
+                        connection_closed_event.blocking_send(ConnectionEvent::ConnectionClosed).unwrap();
                     })
            }
             _ => {
@@ -551,17 +561,17 @@ impl NATSConnection
                         );
                         delay
                     })
-                    .reconnect_callback( || {
+                    .reconnect_callback( move || {
                         info!(target: "borealis_indexer", "connection has been reestablished");
-                        NATSConnection::try_connect(nc.to_owned(), connect_args.to_owned()).unwrap();
+                        connection_reestablished_event.blocking_send(ConnectionEvent::ConnectionReestablished).unwrap();
                     })
-                    .disconnect_callback( || {
+                    .disconnect_callback( move || {
                         info!(target: "borealis_indexer", "connection has been lost");
-                        NATSConnection::try_connect(nc.to_owned(), connect_args.to_owned()).unwrap();
+                        connection_lost_event.blocking_send(ConnectionEvent::ConnectionLost).unwrap();
                     })
-                    .close_callback(|| {
+                    .close_callback(move || {
                         info!(target: "borealis_indexer", "connection has been closed");
-                        NATSConnection::try_connect(nc.to_owned(), connect_args.to_owned()).unwrap();
+                        connection_closed_event.blocking_send(ConnectionEvent::ConnectionClosed).unwrap();
                     })
            }
         };
@@ -569,33 +579,39 @@ impl NATSConnection
     }
 
     /// Create connection to Borealis NATS Bus
-    fn connect(nc: RefCell<NATSConnection>, connect_args: RunArgs) -> Result<RefCell<Self>, Error> {
-        let options = NATSConnection::options(nc.to_owned(), connect_args.to_owned());
-        if let Ok(nats_connection) = options.connect(connect_args.nats_server.as_str()) {
-            return Ok(RefCell::new(Self { connection: Some(nats_connection) }))
+    fn connect(connect_args: RunArgs, connection_event_tx: mpsc::Sender<ConnectionEvent>, actual_connection_tx: broadcast::Sender<NATSConnection>) -> Result<Self, Error> {
+        let nats_connection_initial = NATSConnection::new();
+        let connection_options = nats_connection_initial.options(connect_args.to_owned(), connection_event_tx);
+
+        if let Ok(nats_connection) = connection_options.connect(connect_args.nats_server.as_str()) {
+            actual_connection_tx.send(Self { connection: Some(nats_connection.clone()) }).unwrap();
+            return Ok(Self { connection: Some(nats_connection) })
         } else {
             Err("NATS connection error or wrong credentials".to_string().into())
         }
     }
 
     /// Use already existed connection to Borealis NATS Bus or recreate new connection to prevent connection issues
-    fn try_connect(nc: RefCell<NATSConnection>, connect_args: RunArgs) -> Result<RefCell<Self>, Error> {
-        let options = NATSConnection::options(nc.to_owned(), connect_args.to_owned());
-        if let Ok(rtt_duration) = nc.to_owned().into_inner().connection.unwrap().rtt() {
-            //  info!(target: "borealis_indexer", "NATS Connection: {:?}", self.0);
+    fn try_connect(self, connect_args: RunArgs, connection_event_tx: mpsc::Sender<ConnectionEvent>, actual_connection_tx: broadcast::Sender<NATSConnection>) -> Result<Self, Error> {
+        let nats_connection_initial = NATSConnection::new();
+        let connection_options = nats_connection_initial.options(connect_args.to_owned(), connection_event_tx);
+
+        if let Ok(rtt_duration) = self.connection.as_ref().unwrap().rtt() {
+            // info!(target: "borealis_indexer", "NATS Connection: {:?}", connection.unwrap());
             info!(target: "borealis_indexer", "round trip time (rtt) between this client and the current NATS server: {:?}", rtt_duration);
-            return Ok(RefCell::new(Self { connection: nc.into_inner().connection }))
-        } else if let Ok(nats_connection) = options.connect(connect_args.nats_server.as_str()) {
-            return Ok(RefCell::new(Self { connection: Some(nats_connection) }))
+            return Ok(Self { connection: self.connection })
+        } else if let Ok(nats_connection) = connection_options.connect(connect_args.nats_server.as_str()) {
+            actual_connection_tx.send(Self { connection: Some(nats_connection.clone()) }).unwrap();
+            return Ok(Self { connection: Some(nats_connection) })
         } else {
             Err("NATS connection error or wrong credentials".to_string().into())
         }
     }
 
     /// Check connection to Borealis NATS Bus
-    fn nats_check_connection(nc: RefCell<NATSConnection>) {
-        let nats_connection = nc.into_inner().connection.unwrap();
-        //  info!(target: "borealis_indexer", "NATS Connection: {:?}", self.0);
+    fn nats_check_connection(self) {
+        let nats_connection = self.connection.unwrap();
+        // info!(target: "borealis_indexer", "NATS Connection: {:?}", connection.unwrap());
         info!(target: "borealis_indexer", "round trip time (rtt) between this client and the current NATS server: {:?}", nats_connection.rtt());
         info!(target: "borealis_indexer", "this client IP address, as known by the current NATS server: {:?}", nats_connection.client_ip());
         info!(target: "borealis_indexer", "this client ID, as known by the current NATS server: {:?}", nats_connection.client_id());
@@ -603,7 +619,7 @@ impl NATSConnection
     }
 }
 
-fn main() {
+fn main() -> Result<(), Error> {
     // Search for the root certificates to perform HTTPS/TLS calls
     // for downloading genesis and config files
     openssl_probe::init_ssl_cert_env_vars();
@@ -619,13 +635,17 @@ fn main() {
         .home_dir
         .unwrap_or(std::path::PathBuf::from("./.borealis-indexer"));
 
-    let nats_connection_initial = RefCell::new(NATSConnection::new());
+    let event_processing = Runtime::new()?;
+    let messages_processing = Runtime::new()?;
+
+    let (connection_event_tx, mut connection_event_rx) = mpsc::channel::<ConnectionEvent>(1);
+    let (actual_connection_tx, mut actual_connection_rx) = broadcast::channel::<NATSConnection>(1);
 
     match opts.subcmd {
         SubCommand::Check(run_args) => {
-            let nats_connection = NATSConnection::connect(nats_connection_initial, run_args.to_owned()).unwrap();
-            let nc = NATSConnection::try_connect(nats_connection, run_args.to_owned()).unwrap();
-            NATSConnection::nats_check_connection(nc);
+            let nats_connection = NATSConnection::connect(run_args.to_owned(), connection_event_tx.clone(),  actual_connection_tx.clone()).unwrap();
+            let nats_connection_actual = nats_connection.try_connect(run_args.to_owned(), connection_event_tx.clone(), actual_connection_tx.clone()).unwrap();
+            nats_connection_actual.to_owned().nats_check_connection();
         }
         SubCommand::Init(config_args) => {
             near_indexer::indexer_init_configs(&home_dir, config_args.into())
@@ -653,23 +673,25 @@ fn main() {
                 },
             };
 
-            let nats_connection = NATSConnection::connect(nats_connection_initial, run_args.to_owned()).unwrap();
-            let nc = NATSConnection::try_connect(nats_connection, run_args.to_owned()).unwrap();
+            let nats_connection = NATSConnection::connect(run_args.to_owned(), connection_event_tx.clone(),  actual_connection_tx.clone()).unwrap();
+            let nats_connection_actual = nats_connection.try_connect(run_args.to_owned(), connection_event_tx.clone(), actual_connection_tx.clone()).unwrap();
+            nats_connection_actual.to_owned().nats_check_connection();
 
-            let system = actix::System::new();
-            system.block_on(async move {
+            messages_processing.block_on(async move {
                 let indexer = near_indexer::Indexer::new(indexer_config)
                     .expect("Error while creating Indexer instance");
+
                 let events_stream = indexer.streamer();
-                actix::spawn(message_producer(
+
+                tokio::spawn(async move { message_producer(
                     events_stream,
-                    nc.into_inner().connection.unwrap(),
+                    nats_connection_actual.connection.unwrap(),
                     run_args.subject,
                     run_args.msg_format,
                     opts.verbose,
-                ));
+                )});
             });
-            system.run().unwrap();
         }
     }
+    Ok(())
 }
