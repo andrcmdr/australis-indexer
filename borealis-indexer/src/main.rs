@@ -1,4 +1,3 @@
-use actix;
 use borealis_types::prelude::BorealisMessage;
 use clap::Clap;
 use configs::{
@@ -599,7 +598,8 @@ impl NATSConnection
         if let Ok(rtt_duration) = self.connection.as_ref().unwrap().rtt() {
             // info!(target: "borealis_indexer", "NATS Connection: {:?}", connection.unwrap());
             info!(target: "borealis_indexer", "round trip time (rtt) between this client and the current NATS server: {:?}", rtt_duration);
-            return Ok(Self { connection: self.connection })
+            actual_connection_tx.send(self.clone()).unwrap();
+            return Ok(self)
         } else if let Ok(nats_connection) = connection_options.connect(connect_args.nats_server.as_str()) {
             actual_connection_tx.send(Self { connection: Some(nats_connection.clone()) }).unwrap();
             return Ok(Self { connection: Some(nats_connection) })
@@ -635,17 +635,47 @@ fn main() -> Result<(), Error> {
         .home_dir
         .unwrap_or(std::path::PathBuf::from("./.borealis-indexer"));
 
-    let event_processing = Runtime::new()?;
+    let events_processing = Runtime::new()?;
     let messages_processing = Runtime::new()?;
 
     let (connection_event_tx, mut connection_event_rx) = mpsc::channel::<ConnectionEvent>(1);
     let (actual_connection_tx, mut actual_connection_rx) = broadcast::channel::<NATSConnection>(1);
 
+    let runtime_args = {
+        if let SubCommand::Check(run_args) | SubCommand::Run(run_args) = opts.subcmd.clone() {
+            Some(run_args)
+        } else {
+            None
+        }
+    }.unwrap();
+
+    events_processing.block_on(async {
+        while let Some(event) = connection_event_rx.recv().await {
+            match event {
+                ConnectionEvent::ConnectionReestablished => {
+                    info!(target: "borealis_indexer", "connection has been reestablished, thus checking connection is active...");
+                    let nats_connection = actual_connection_rx.recv().await.unwrap();
+                    let _nats_connection_actual = nats_connection.try_connect(runtime_args.to_owned(), connection_event_tx.clone(), actual_connection_tx.clone()).unwrap();
+                },
+                ConnectionEvent::ConnectionLost => {
+                    info!(target: "borealis_indexer", "connection has been lost, thus retrieving connection...");
+                    let nats_connection = actual_connection_rx.recv().await.unwrap();
+                    let _nats_connection_actual = nats_connection.try_connect(runtime_args.to_owned(), connection_event_tx.clone(), actual_connection_tx.clone()).unwrap();
+                },
+                ConnectionEvent::ConnectionClosed => {
+                    info!(target: "borealis_indexer", "connection has been closed, thus retrieving connection...");
+                    let nats_connection = actual_connection_rx.recv().await.unwrap();
+                    let _nats_connection_actual = nats_connection.try_connect(runtime_args.to_owned(), connection_event_tx.clone(), actual_connection_tx.clone()).unwrap();
+                },
+            }
+        }
+    });
+
     match opts.subcmd {
         SubCommand::Check(run_args) => {
             let nats_connection = NATSConnection::connect(run_args.to_owned(), connection_event_tx.clone(),  actual_connection_tx.clone()).unwrap();
             let nats_connection_actual = nats_connection.try_connect(run_args.to_owned(), connection_event_tx.clone(), actual_connection_tx.clone()).unwrap();
-            nats_connection_actual.to_owned().nats_check_connection();
+            nats_connection_actual.nats_check_connection();
         }
         SubCommand::Init(config_args) => {
             near_indexer::indexer_init_configs(&home_dir, config_args.into())
@@ -685,7 +715,7 @@ fn main() -> Result<(), Error> {
 
                 tokio::spawn(async move { message_producer(
                     events_stream,
-                    nats_connection_actual.connection.unwrap(),
+                    actual_connection_rx.recv().await.unwrap().connection.unwrap(),
                     run_args.subject,
                     run_args.msg_format,
                     opts.verbose,
