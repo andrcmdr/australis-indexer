@@ -7,7 +7,7 @@ use nats;
 use near_indexer;
 use serde_cbor as cbor;
 use serde_json;
-use tokio::sync::{mpsc, broadcast};
+use tokio::sync::mpsc;
 use tokio::runtime::Runtime;
 use tracing::info;
 
@@ -578,12 +578,12 @@ impl NATSConnection
     }
 
     /// Create connection to Borealis NATS Bus
-    fn connect(connect_args: RunArgs, connection_event_tx: mpsc::Sender<ConnectionEvent>, actual_connection_tx: broadcast::Sender<NATSConnection>) -> Result<Self, Error> {
+    fn connect(connect_args: RunArgs, connection_event_tx: mpsc::Sender<ConnectionEvent>, actual_connection_tx: mpsc::Sender<NATSConnection>) -> Result<Self, Error> {
         let nats_connection_initial = NATSConnection::new();
         let connection_options = nats_connection_initial.options(connect_args.to_owned(), connection_event_tx);
 
         if let Ok(nats_connection) = connection_options.connect(connect_args.nats_server.as_str()) {
-            actual_connection_tx.send(Self { connection: Some(nats_connection.clone()) }).unwrap();
+            actual_connection_tx.blocking_send(Self { connection: Some(nats_connection.clone()) }).unwrap();
             return Ok(Self { connection: Some(nats_connection) })
         } else {
             Err("NATS connection error or wrong credentials".to_string().into())
@@ -591,17 +591,17 @@ impl NATSConnection
     }
 
     /// Use already existed connection to Borealis NATS Bus or recreate new connection to prevent connection issues
-    fn try_connect(self, connect_args: RunArgs, connection_event_tx: mpsc::Sender<ConnectionEvent>, actual_connection_tx: broadcast::Sender<NATSConnection>) -> Result<Self, Error> {
+    fn try_connect(self, connect_args: RunArgs, connection_event_tx: mpsc::Sender<ConnectionEvent>, actual_connection_tx: mpsc::Sender<NATSConnection>) -> Result<Self, Error> {
         let nats_connection_initial = NATSConnection::new();
         let connection_options = nats_connection_initial.options(connect_args.to_owned(), connection_event_tx);
 
         if let Ok(rtt_duration) = self.connection.as_ref().unwrap().rtt() {
             // info!(target: "borealis_indexer", "NATS Connection: {:?}", connection.unwrap());
             info!(target: "borealis_indexer", "round trip time (rtt) between this client and the current NATS server: {:?}", rtt_duration);
-            actual_connection_tx.send(self.clone()).unwrap();
+            actual_connection_tx.blocking_send(self.clone()).unwrap();
             return Ok(self)
         } else if let Ok(nats_connection) = connection_options.connect(connect_args.nats_server.as_str()) {
-            actual_connection_tx.send(Self { connection: Some(nats_connection.clone()) }).unwrap();
+            actual_connection_tx.blocking_send(Self { connection: Some(nats_connection.clone()) }).unwrap();
             return Ok(Self { connection: Some(nats_connection) })
         } else {
             Err("NATS connection error or wrong credentials".to_string().into())
@@ -639,7 +639,7 @@ fn main() -> Result<(), Error> {
     let messages_processing = Runtime::new()?;
 
     let (connection_event_tx, mut connection_event_rx) = mpsc::channel::<ConnectionEvent>(1);
-    let (actual_connection_tx, mut actual_connection_rx) = broadcast::channel::<NATSConnection>(1);
+    let (actual_connection_tx, mut actual_connection_rx) = mpsc::channel::<NATSConnection>(1);
 
     let runtime_args = {
         if let SubCommand::Check(run_args) | SubCommand::Run(run_args) = opts.subcmd.clone() {
