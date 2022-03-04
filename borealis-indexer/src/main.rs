@@ -7,8 +7,8 @@ use nats;
 use near_indexer;
 use serde_cbor as cbor;
 use serde_json;
-use tokio::sync::mpsc;
-use tokio::runtime::Runtime;
+use tokio::sync::{mpsc, broadcast};
+use tokio::runtime;
 use tracing::info;
 
 pub mod configs;
@@ -578,12 +578,12 @@ impl NATSConnection
     }
 
     /// Create connection to Borealis NATS Bus
-    fn connect(connect_args: RunArgs, connection_event_tx: mpsc::Sender<ConnectionEvent>, actual_connection_tx: mpsc::Sender<NATSConnection>) -> Result<Self, Error> {
+    fn connect(connect_args: RunArgs, connection_event_tx: mpsc::Sender<ConnectionEvent>, actual_connection_tx: broadcast::Sender<NATSConnection>) -> Result<Self, Error> {
         let nats_connection_initial = NATSConnection::new();
         let connection_options = nats_connection_initial.options(connect_args.to_owned(), connection_event_tx);
 
         if let Ok(nats_connection) = connection_options.connect(connect_args.nats_server.as_str()) {
-            actual_connection_tx.blocking_send(Self { connection: Some(nats_connection.clone()) }).unwrap();
+            actual_connection_tx.send(Self { connection: Some(nats_connection.clone()) }).unwrap();
             return Ok(Self { connection: Some(nats_connection) })
         } else {
             Err("NATS connection error or wrong credentials".to_string().into())
@@ -591,17 +591,17 @@ impl NATSConnection
     }
 
     /// Use already existed connection to Borealis NATS Bus or recreate new connection to prevent connection issues
-    fn try_connect(self, connect_args: RunArgs, connection_event_tx: mpsc::Sender<ConnectionEvent>, actual_connection_tx: mpsc::Sender<NATSConnection>) -> Result<Self, Error> {
+    fn try_connect(self, connect_args: RunArgs, connection_event_tx: mpsc::Sender<ConnectionEvent>, actual_connection_tx: broadcast::Sender<NATSConnection>) -> Result<Self, Error> {
         let nats_connection_initial = NATSConnection::new();
         let connection_options = nats_connection_initial.options(connect_args.to_owned(), connection_event_tx);
 
         if let Ok(rtt_duration) = self.connection.as_ref().unwrap().rtt() {
             // info!(target: "borealis_indexer", "NATS Connection: {:?}", connection.unwrap());
             info!(target: "borealis_indexer", "round trip time (rtt) between this client and the current NATS server: {:?}", rtt_duration);
-            actual_connection_tx.blocking_send(self.clone()).unwrap();
+            actual_connection_tx.send(self.clone()).unwrap();
             return Ok(self)
         } else if let Ok(nats_connection) = connection_options.connect(connect_args.nats_server.as_str()) {
-            actual_connection_tx.blocking_send(Self { connection: Some(nats_connection.clone()) }).unwrap();
+            actual_connection_tx.send(Self { connection: Some(nats_connection.clone()) }).unwrap();
             return Ok(Self { connection: Some(nats_connection) })
         } else {
             Err("NATS connection error or wrong credentials".to_string().into())
@@ -635,41 +635,43 @@ fn main() -> Result<(), Error> {
         .home_dir
         .unwrap_or(std::path::PathBuf::from("./.borealis-indexer"));
 
-    let events_processing = Runtime::new()?;
-    let messages_processing = Runtime::new()?;
+    let events_processing = runtime::Builder::new_multi_thread().enable_all().thread_name("connection-events-processing").build()?;
+    let messages_processing = runtime::Builder::new_multi_thread().enable_all().thread_name("streamer-messages-processing").build()?;
 
     let (connection_event_tx, mut connection_event_rx) = mpsc::channel::<ConnectionEvent>(1);
-    let (actual_connection_tx, mut actual_connection_rx) = mpsc::channel::<NATSConnection>(1);
+    let (actual_connection_tx, mut actual_connection_rx) = broadcast::channel::<NATSConnection>(1);
 
-    let runtime_args = {
-        if let SubCommand::Check(run_args) | SubCommand::Run(run_args) = opts.subcmd.clone() {
-            Some(run_args)
-        } else {
-            None
-        }
-    }.unwrap();
+    let connection_event_sender = connection_event_tx.clone();
+    let actual_connection_sender = actual_connection_tx.clone();
+    let mut actual_connection_receiver = actual_connection_tx.subscribe();
 
-    events_processing.block_on(async {
-        while let Some(event) = connection_event_rx.recv().await {
-            match event {
-                ConnectionEvent::ConnectionReestablished => {
-                    info!(target: "borealis_indexer", "connection has been reestablished, thus checking connection is active...");
-                    let nats_connection = actual_connection_rx.recv().await.unwrap();
-                    let _nats_connection_actual = nats_connection.try_connect(runtime_args.to_owned(), connection_event_tx.clone(), actual_connection_tx.clone()).unwrap();
-                },
-                ConnectionEvent::ConnectionLost => {
-                    info!(target: "borealis_indexer", "connection has been lost, thus retrieving connection...");
-                    let nats_connection = actual_connection_rx.recv().await.unwrap();
-                    let _nats_connection_actual = nats_connection.try_connect(runtime_args.to_owned(), connection_event_tx.clone(), actual_connection_tx.clone()).unwrap();
-                },
-                ConnectionEvent::ConnectionClosed => {
-                    info!(target: "borealis_indexer", "connection has been closed, thus retrieving connection...");
-                    let nats_connection = actual_connection_rx.recv().await.unwrap();
-                    let _nats_connection_actual = nats_connection.try_connect(runtime_args.to_owned(), connection_event_tx.clone(), actual_connection_tx.clone()).unwrap();
-                },
+    // let events_processing_handle = events_processing.handle();
+    // events_processing_handle.enter();
+    // tokio::spawn(future);
+
+    if let SubCommand::Check(run_args) | SubCommand::Run(run_args) = opts.subcmd.clone() {
+        events_processing.spawn(async move {
+            while let Some(event) = connection_event_rx.recv().await {
+                match event {
+                    ConnectionEvent::ConnectionReestablished => {
+                        info!(target: "borealis_indexer", "connection has been reestablished, thus checking connection is active...");
+                        let nats_connection = actual_connection_receiver.recv().await.unwrap();
+                        let _nats_connection_actual = nats_connection.try_connect(run_args.to_owned(), connection_event_sender.clone(), actual_connection_sender.clone()).unwrap();
+                    },
+                    ConnectionEvent::ConnectionLost => {
+                        info!(target: "borealis_indexer", "connection has been lost, thus retrieving connection...");
+                        let nats_connection = actual_connection_receiver.recv().await.unwrap();
+                        let _nats_connection_actual = nats_connection.try_connect(run_args.to_owned(), connection_event_sender.clone(), actual_connection_sender.clone()).unwrap();
+                    },
+                    ConnectionEvent::ConnectionClosed => {
+                        info!(target: "borealis_indexer", "connection has been closed, thus retrieving connection...");
+                        let nats_connection = actual_connection_receiver.recv().await.unwrap();
+                        let _nats_connection_actual = nats_connection.try_connect(run_args.to_owned(), connection_event_sender.clone(), actual_connection_sender.clone()).unwrap();
+                    },
+                }
             }
-        }
-    });
+        });
+    };
 
     match opts.subcmd {
         SubCommand::Check(run_args) => {
@@ -707,7 +709,7 @@ fn main() -> Result<(), Error> {
             let nats_connection_actual = nats_connection.try_connect(run_args.to_owned(), connection_event_tx.clone(), actual_connection_tx.clone()).unwrap();
             nats_connection_actual.to_owned().nats_check_connection();
 
-            messages_processing.block_on(async move {
+            messages_processing.spawn(async move {
                 let indexer = near_indexer::Indexer::new(indexer_config)
                     .expect("Error while creating Indexer instance");
 
@@ -723,5 +725,9 @@ fn main() -> Result<(), Error> {
             });
         }
     }
+    // Graceful shutdown for all tasks (futures, green threads) currently executed on existed run-time thread-pools
+    info!(target: "borealis_indexer", "Shutdown process within 10 seconds...");
+    messages_processing.shutdown_timeout(core::time::Duration::from_secs(10));
+    events_processing.shutdown_timeout(core::time::Duration::from_secs(10));
     Ok(())
 }
