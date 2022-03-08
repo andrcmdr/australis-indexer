@@ -301,13 +301,6 @@ async fn message_producer(
             &streamer_message.block.header.hash
         );
 
-        if let Some(_verbosity_level) = verbosity_level {
-            println!(
-                "block_height: #{}, block_hash: {}\n",
-                &streamer_message.block.header.height, &streamer_message.block.header.hash
-            );
-        };
-
         if let Some(VerbosityLevel::WithStreamerMessageDump)
         | Some(VerbosityLevel::WithStreamerMessageParse) = verbosity_level
         {
@@ -590,11 +583,12 @@ impl NATSConnection
         let nats_connection_initial = NATSConnection::new();
         let connection_options = nats_connection_initial.options(connect_args.to_owned(), connection_event_tx);
 
-        if let Ok(nats_connection) = connection_options.connect(connect_args.nats_server.as_str()) {
-            actual_connection_tx.send(Self { connection: Some(nats_connection.clone()) }).unwrap();
-            return Ok(Self { connection: Some(nats_connection) })
-        } else {
-            Err("NATS connection error or wrong credentials".to_string().into())
+        match connection_options.connect(connect_args.nats_server.as_str()) {
+            Ok(nats_connection) => {
+                actual_connection_tx.send(Self { connection: Some(nats_connection.clone()) }).unwrap();
+                return Ok(Self { connection: Some(nats_connection) })
+            },
+            Err(error) => Err(format!("NATS connection error or wrong credentials: {:?}", error).into()),
         }
     }
 
@@ -608,11 +602,14 @@ impl NATSConnection
             info!(target: "borealis_indexer", "round trip time (rtt) between this client and the current NATS server: {:?}", rtt_duration);
             actual_connection_tx.send(self.clone()).unwrap();
             return Ok(self)
-        } else if let Ok(nats_connection) = connection_options.connect(connect_args.nats_server.as_str()) {
-            actual_connection_tx.send(Self { connection: Some(nats_connection.clone()) }).unwrap();
-            return Ok(Self { connection: Some(nats_connection) })
         } else {
-            Err("NATS connection error or wrong credentials".to_string().into())
+            match connection_options.connect(connect_args.nats_server.as_str()) {
+                Ok(nats_connection) => {
+                    actual_connection_tx.send(Self { connection: Some(nats_connection.clone()) }).unwrap();
+                    return Ok(Self { connection: Some(nats_connection) })
+                },
+                Err(error) => Err(format!("NATS connection error or wrong credentials: {:?}", error).into()),
+            }
         }
     }
 
@@ -643,47 +640,73 @@ fn main() -> Result<(), Error> {
         .home_dir
         .unwrap_or(std::path::PathBuf::from("./.borealis-indexer"));
 
-    let events_processing = runtime::Builder::new_multi_thread()
-        .enable_all()
-        .thread_name_fn( || {
-            static THREAD_ID: AtomicUsize = AtomicUsize::new(0);
-            let thread_id = THREAD_ID.fetch_add(1, Ordering::SeqCst);
-            format!("connection-events-processing-{}", thread_id)
-         })
-        .on_thread_start( || {
-            info!(target: "borealis_indexer", "NATS connection events processing runtime: thread starting");
-        })
-        .on_thread_stop( || {
-            info!(target: "borealis_indexer", "NATS connection events processing runtime: thread stopping");
-        })
-        .on_thread_park( || {
-            info!(target: "borealis_indexer", "NATS connection events processing runtime: thread parking and going idle");
-        })
-        .on_thread_unpark( || {
-            info!(target: "borealis_indexer", "NATS connection events processing runtime: thread unparked and starts executing tasks");
-        })
-        .build()?;
+    let (events_processing, messages_processing) = {
+        if let Some(VerbosityLevel::WithRuntimeThreadsDump) = opts.verbose.clone() {
+            let events_processing = runtime::Builder::new_multi_thread()
+                .enable_all()
+                .thread_name_fn( || {
+                    static THREAD_ID: AtomicUsize = AtomicUsize::new(0);
+                    let thread_id = THREAD_ID.fetch_add(1, Ordering::SeqCst);
+                    format!("connection-events-processing-{}", thread_id)
+                })
+                .on_thread_start( || {
+                    info!(target: "borealis_indexer", "NATS connection events processing runtime: thread starting");
+                })
+                .on_thread_stop( || {
+                    info!(target: "borealis_indexer", "NATS connection events processing runtime: thread stopping");
+                })
+                .on_thread_park( || {
+                    info!(target: "borealis_indexer", "NATS connection events processing runtime: thread parking and going idle");
+                })
+                .on_thread_unpark( || {
+                    info!(target: "borealis_indexer", "NATS connection events processing runtime: thread unparked and starts executing tasks");
+                })
+                .build()?;
 
-    let messages_processing = runtime::Builder::new_multi_thread()
-        .enable_all()
-        .thread_name_fn( || {
-            static THREAD_ID: AtomicUsize = AtomicUsize::new(0);
-            let thread_id = THREAD_ID.fetch_add(1, Ordering::SeqCst);
-            format!("streamer-messages-processing-{}", thread_id)
-         })
-        .on_thread_start( || {
-            info!(target: "borealis_indexer", "Streamer Messages processing runtime: thread starting");
-        })
-        .on_thread_stop( || {
-            info!(target: "borealis_indexer", "Streamer Messages processing runtime: thread stopping");
-        })
-        .on_thread_park( || {
-            info!(target: "borealis_indexer", "Streamer Messages processing runtime: thread parking and going idle");
-        })
-        .on_thread_unpark( || {
-            info!(target: "borealis_indexer", "Streamer Messages processing runtime: thread unparked and starts executing tasks");
-        })
-        .build()?;
+            let messages_processing = runtime::Builder::new_multi_thread()
+                .enable_all()
+                .thread_name_fn( || {
+                    static THREAD_ID: AtomicUsize = AtomicUsize::new(0);
+                    let thread_id = THREAD_ID.fetch_add(1, Ordering::SeqCst);
+                    format!("streamer-messages-processing-{}", thread_id)
+                })
+                .on_thread_start( || {
+                    info!(target: "borealis_indexer", "Streamer Messages processing runtime: thread starting");
+                })
+                .on_thread_stop( || {
+                    info!(target: "borealis_indexer", "Streamer Messages processing runtime: thread stopping");
+                })
+                .on_thread_park( || {
+                    info!(target: "borealis_indexer", "Streamer Messages processing runtime: thread parking and going idle");
+                })
+                .on_thread_unpark( || {
+                    info!(target: "borealis_indexer", "Streamer Messages processing runtime: thread unparked and starts executing tasks");
+                })
+                .build()?;
+
+            (events_processing, messages_processing)
+        } else {
+            let events_processing = runtime::Builder::new_multi_thread()
+                .enable_all()
+                .thread_name_fn( || {
+                    static THREAD_ID: AtomicUsize = AtomicUsize::new(0);
+                    let thread_id = THREAD_ID.fetch_add(1, Ordering::SeqCst);
+                    format!("connection-events-processing-{}", thread_id)
+                })
+                .build()?;
+
+            let messages_processing = runtime::Builder::new_multi_thread()
+                .enable_all()
+                .thread_name_fn( || {
+                    static THREAD_ID: AtomicUsize = AtomicUsize::new(0);
+                    let thread_id = THREAD_ID.fetch_add(1, Ordering::SeqCst);
+                    format!("streamer-messages-processing-{}", thread_id)
+                })
+                .build()?;
+
+            (events_processing, messages_processing)
+        }
+    };
 
     let (connection_event_tx, mut connection_event_rx) = mpsc::channel::<ConnectionEvent>(1);
     let (actual_connection_tx, mut actual_connection_rx) = broadcast::channel::<NATSConnection>(1);
@@ -783,7 +806,7 @@ fn main() -> Result<(), Error> {
                     run_args.subject,
                     run_args.msg_format,
                     opts.verbose,
-                )});
+                ).await});
             });
         }
     }
