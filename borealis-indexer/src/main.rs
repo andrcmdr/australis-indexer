@@ -271,6 +271,8 @@ async fn message_producer(
             }
         }.unwrap().connection.unwrap();
 
+        info!(target: "borealis_indexer", "Message Producer: Nats Connection: {:?}", nats_connection.to_owned());
+
         // Stream message to NATS
         match msg_format {
             MsgFormat::Cbor => {
@@ -422,8 +424,12 @@ enum ConnectionEvent {
     ConnectionClosed,
 }
 
+static CID: AtomicUsize = AtomicUsize::new(0);
+
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 struct NATSConnection {
+    cid: usize,
     connection: Option<nats::Connection>,
 }
 
@@ -432,7 +438,11 @@ impl NATSConnection
         Self: Send + Sync + 'static,
 {
     fn new() -> NATSConnection {
+        let _connection_id = CID.fetch_add(1, Ordering::SeqCst);
+        let cid = CID.load(Ordering::SeqCst);
+
         NATSConnection {
+            cid,
             connection: None,
         }
     }
@@ -585,8 +595,10 @@ impl NATSConnection
 
         match connection_options.connect(connect_args.nats_server.as_str()) {
             Ok(nats_connection) => {
-                actual_connection_tx.send(Self { connection: Some(nats_connection.clone()) }).unwrap();
-                return Ok(Self { connection: Some(nats_connection) })
+                let _connection_id = CID.fetch_add(1, Ordering::SeqCst);
+                let cid = CID.load(Ordering::SeqCst);
+                actual_connection_tx.send(Self { cid: cid.clone(), connection: Some(nats_connection.clone()) }).unwrap();
+                return Ok(Self { cid, connection: Some(nats_connection) })
             },
             Err(error) => Err(format!("NATS connection error or wrong credentials: {:?}", error).into()),
         }
@@ -605,8 +617,10 @@ impl NATSConnection
         } else {
             match connection_options.connect(connect_args.nats_server.as_str()) {
                 Ok(nats_connection) => {
-                    actual_connection_tx.send(Self { connection: Some(nats_connection.clone()) }).unwrap();
-                    return Ok(Self { connection: Some(nats_connection) })
+                    let _connection_id = CID.fetch_add(1, Ordering::SeqCst);
+                    let cid = CID.load(Ordering::SeqCst);
+                    actual_connection_tx.send(Self { cid: cid.clone(), connection: Some(nats_connection.clone()) }).unwrap();
+                    return Ok(Self { cid, connection: Some(nats_connection) })
                 },
                 Err(error) => Err(format!("NATS connection error or wrong credentials: {:?}", error).into()),
             }
@@ -731,7 +745,9 @@ fn main() -> Result<(), Error> {
                                 Err(_error) => actual_connection_rx.recv().await,
                             }
                         }.unwrap();
-                        let _nats_connection_actual = nats_connection.try_connect(run_args.to_owned(), connection_event_tx.clone(), actual_connection_tx.clone()).unwrap();
+                        info!(target: "borealis_indexer", "Events Processing: Nats Connection: {:?}", nats_connection.to_owned());
+                        let nats_connection_actual = nats_connection.try_connect(run_args.to_owned(), connection_event_tx.clone(), actual_connection_tx.clone()).unwrap();
+                        info!(target: "borealis_indexer", "Events Processing: Nats Connection actual: {:?}", nats_connection_actual.to_owned());
                     },
                     ConnectionEvent::ConnectionLost => {
                         info!(target: "borealis_indexer", "connection has been lost, thus retrieving connection...");
@@ -741,7 +757,9 @@ fn main() -> Result<(), Error> {
                                 Err(_error) => actual_connection_rx.recv().await,
                             }
                         }.unwrap();
-                        let _nats_connection_actual = nats_connection.try_connect(run_args.to_owned(), connection_event_tx.clone(), actual_connection_tx.clone()).unwrap();
+                        info!(target: "borealis_indexer", "Events Processing: Nats Connection: {:?}", nats_connection.to_owned());
+                        let nats_connection_actual = nats_connection.try_connect(run_args.to_owned(), connection_event_tx.clone(), actual_connection_tx.clone()).unwrap();
+                        info!(target: "borealis_indexer", "Events Processing: Nats Connection actual: {:?}", nats_connection_actual.to_owned());
                     },
                     ConnectionEvent::ConnectionClosed => {
                         info!(target: "borealis_indexer", "connection has been closed, thus retrieving connection...");
@@ -751,7 +769,9 @@ fn main() -> Result<(), Error> {
                                 Err(_error) => actual_connection_rx.recv().await,
                             }
                         }.unwrap();
-                        let _nats_connection_actual = nats_connection.try_connect(run_args.to_owned(), connection_event_tx.clone(), actual_connection_tx.clone()).unwrap();
+                        info!(target: "borealis_indexer", "Events Processing: Nats Connection: {:?}", nats_connection.to_owned());
+                        let nats_connection_actual = nats_connection.try_connect(run_args.to_owned(), connection_event_tx.clone(), actual_connection_tx.clone()).unwrap();
+                        info!(target: "borealis_indexer", "Events Processing: Nats Connection actual: {:?}", nats_connection_actual.to_owned());
                     },
                 }
             }
@@ -761,7 +781,9 @@ fn main() -> Result<(), Error> {
     match opts.subcmd {
         SubCommand::Check(run_args) => {
             let nats_connection = NATSConnection::connect(run_args.to_owned(), connection_event_sender.clone(),  actual_connection_sender.clone()).unwrap();
+            info!(target: "borealis_indexer", "Main(): Check: Nats Connection: {:?}", nats_connection.to_owned());
             let nats_connection_actual = nats_connection.try_connect(run_args.to_owned(), connection_event_sender.clone(), actual_connection_sender.clone()).unwrap();
+            info!(target: "borealis_indexer", "Main(): Check: Nats Connection actual: {:?}", nats_connection_actual.to_owned());
             nats_connection_actual.nats_check_connection();
         }
         SubCommand::Init(config_args) => {
@@ -791,7 +813,9 @@ fn main() -> Result<(), Error> {
             };
 
             let nats_connection = NATSConnection::connect(run_args.to_owned(), connection_event_sender.clone(),  actual_connection_sender.clone()).unwrap();
+            info!(target: "borealis_indexer", "Main(): Run: Nats Connection: {:?}", nats_connection.to_owned());
             let nats_connection_actual = nats_connection.try_connect(run_args.to_owned(), connection_event_sender.clone(), actual_connection_sender.clone()).unwrap();
+            info!(target: "borealis_indexer", "Main(): Run: Nats Connection actual: {:?}", nats_connection_actual.to_owned());
             nats_connection_actual.to_owned().nats_check_connection();
 
             messages_processing.spawn(async move {
