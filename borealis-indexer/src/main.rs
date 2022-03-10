@@ -438,7 +438,6 @@ impl NATSConnection
         Self: Send + Sync + 'static,
 {
     fn new() -> NATSConnection {
-        let _connection_id = CID.fetch_add(1, Ordering::SeqCst);
         let cid = CID.load(Ordering::SeqCst);
 
         NATSConnection {
@@ -595,8 +594,9 @@ impl NATSConnection
 
         match connection_options.connect(connect_args.nats_server.as_str()) {
             Ok(nats_connection) => {
-                let _connection_id = CID.fetch_add(1, Ordering::SeqCst);
+                let connection_id = CID.fetch_add(1, Ordering::SeqCst);
                 let cid = CID.load(Ordering::SeqCst);
+                info!(target: "borealis_indexer", "Connect: CID: {}, {}; Nats Connection: {:?}", connection_id.clone(), cid.clone(), nats_connection.to_owned());
                 actual_connection_tx.send(Self { cid: cid.clone(), connection: Some(nats_connection.clone()) }).unwrap();
                 return Ok(Self { cid, connection: Some(nats_connection) })
             },
@@ -617,8 +617,9 @@ impl NATSConnection
         } else {
             match connection_options.connect(connect_args.nats_server.as_str()) {
                 Ok(nats_connection) => {
-                    let _connection_id = CID.fetch_add(1, Ordering::SeqCst);
+                    let connection_id = CID.fetch_add(1, Ordering::SeqCst);
                     let cid = CID.load(Ordering::SeqCst);
+                    info!(target: "borealis_indexer", "Reconnect: CID: {}, {}; Nats Connection: {:?}", connection_id.clone(), cid.clone(), nats_connection.to_owned());
                     actual_connection_tx.send(Self { cid: cid.clone(), connection: Some(nats_connection.clone()) }).unwrap();
                     return Ok(Self { cid, connection: Some(nats_connection) })
                 },
