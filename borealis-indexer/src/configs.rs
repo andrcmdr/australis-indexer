@@ -7,7 +7,7 @@ use tracing_subscriber::EnvFilter;
 use core::str::FromStr;
 use std::string::ToString;
 
-type Error = Box<dyn std::error::Error + 'static>;
+pub type Error = Box<dyn std::error::Error + 'static>;
 
 /// CLI options (subcommands and flags)
 #[derive(Clap, Debug)]
@@ -158,7 +158,7 @@ impl FromStr for AwaitSynced {
 /// WithStreamerMessageParse - full dump with full parse of `StreamerMessage`
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum VerbosityLevel {
-    WithBlockHashHeight,
+    WithRuntimeThreadsDump,
     WithStreamerMessageDump,
     WithStreamerMessageParse,
 }
@@ -168,7 +168,7 @@ impl FromStr for VerbosityLevel {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let input = s.to_lowercase();
         match input.as_str() {
-            "0" | "withblockhashheight" => Ok(VerbosityLevel::WithBlockHashHeight),
+            "0" | "withruntimethreadsdump" => Ok(VerbosityLevel::WithRuntimeThreadsDump),
             "1" | "withstreamermessagedump" => Ok(VerbosityLevel::WithStreamerMessageDump),
             "2" | "withstreamermessageparse" => Ok(VerbosityLevel::WithStreamerMessageParse),
             _ => Err("Unknown output verbosity level: `--verbose` should be `WithBlockHashHeight` (`0`), `WithStreamerMessageDump` (`1`) or `WithStreamerMessageParse` (`2`)".to_string().into()),
