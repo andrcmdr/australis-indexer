@@ -557,7 +557,7 @@ fn main() {
 
             // JetStreams cannot be created from NATS Client side due to restrictions on NATS server side, but this ability is still available for client side consumers
             let stream_info = nats_connection.create_stream(StreamConfig {
-                name: format!("{}_{}", run_args.subject, run_args.msg_format.to_string()),
+                name: format!("JS_{}_{}", run_args.subject, run_args.msg_format.to_string()),
                 discard: DiscardPolicy::Old,
                 subjects: Some(vec![format!("{}_{}", run_args.subject, run_args.msg_format.to_string())]),
                 duplicate_window: 86400,
@@ -566,12 +566,12 @@ fn main() {
                 ..Default::default()
             }).expect("IO error, something went wrong while creating a new stream, maybe stream already exist");
 
-            let consumer = nats_connection.create_consumer(format!("{}_{}", run_args.subject, run_args.msg_format.to_string()).as_str(), ConsumerConfig {
-                deliver_subject: Some(format!("{}_{}", run_args.subject, run_args.msg_format.to_string())),
-                durable_name: Some(format!("Borealis_Consumer_{}_{}", run_args.subject, run_args.msg_format.to_string())),
-                deliver_policy: DeliverPolicy::Last,
+            let consumer = nats_connection.create_consumer(format!("JS_{}_{}", run_args.subject, run_args.msg_format.to_string()).as_str(), ConsumerConfig {
+                deliver_subject: Some(format!("JetStream_{}_{}", run_args.subject, run_args.msg_format.to_string())),
+                durable_name: Some(format!("Borealis_Consumer_JetStream_{}_{}", run_args.subject, run_args.msg_format.to_string())),
+                deliver_policy: DeliverPolicy::All,
                 ack_policy: AckPolicy::Explicit,
-                filter_subject: format!("{}_{}", run_args.subject, run_args.msg_format.to_string()),
+                // filter_subject: format!("{}_{}", run_args.subject, run_args.msg_format.to_string()),
                 replay_policy: ReplayPolicy::Instant,
                 ..Default::default()
             }).expect("IO error, something went wrong while creating a new consumer, maybe consumer already exist");
@@ -617,26 +617,40 @@ fn main() {
                         };
                     },
                     WorkMode::Jetstream => {
-                        let mut consumer = Consumer::create_or_open(nats_connection, format!("{}_{}", run_args.subject, run_args.msg_format.to_string()).as_str(), ConsumerConfig {
-                            deliver_subject: Some(format!("{}_{}", run_args.subject, run_args.msg_format.to_string())),
-                            durable_name: Some(format!("Borealis_Consumer_{}_{}", run_args.subject, run_args.msg_format.to_string())),
-                            deliver_policy: DeliverPolicy::Last,
+                        info!(
+                            target: "borealis_consumer",
+                            "JetStream consumer started\n"
+                        );
+
+                        let mut consumer = Consumer::create_or_open(nats_connection, format!("JS_{}_{}", run_args.subject, run_args.msg_format.to_string()).as_str(), ConsumerConfig {
+                            deliver_subject: Some(format!("JetStream_{}_{}", run_args.subject, run_args.msg_format.to_string())),
+                            durable_name: Some(format!("Borealis_Consumer_JetStream_{}_{}", run_args.subject, run_args.msg_format.to_string())),
+                            deliver_policy: DeliverPolicy::All,
                             ack_policy: AckPolicy::Explicit,
-                            filter_subject: format!("{}_{}", run_args.subject, run_args.msg_format.to_string()),
+                            // filter_subject: format!("{}_{}", run_args.subject, run_args.msg_format.to_string()),
                             replay_policy: ReplayPolicy::Instant,
                             ..Default::default()
                         }).expect("IO error, something went wrong while creating a new consumer or returning an existent consumer");
+
+                        consumer.timeout = std::time::Duration::from_millis(10000);
 
                         loop {
                             info!(
                                 target: "borealis_consumer",
                                 "Message JetStream consumer loop started: listening for new messages\n"
                             );
-                            let message = consumer.process(|msg| {
+                            if let Ok(message) = consumer.process_timeout(|msg| {
                                 info!(target: "borealis_consumer", "Received message:\n{}", msg);
                                 Ok(msg.to_owned())
-                            }).expect("IO error, something went wrong while receiving a new message");
-                            message_consumer(message, run_args.msg_format, opts.verbose);
+                            }) {
+                                message_consumer(message, run_args.msg_format, opts.verbose);
+                            } else {
+                                info!(
+                                    target: "borealis_consumer",
+                                    "Message wasn't received within {:?} timeframe: Error occured due to waiting timeout for message receiving was elapsed\n",
+                                    consumer.timeout
+                                );
+                            };
                         };
                     },
                 }
