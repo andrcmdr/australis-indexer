@@ -2,5 +2,4 @@
 members = [
     "borealis-indexer",
     "borealis-consumer",
-    "near-indexer",
 ]

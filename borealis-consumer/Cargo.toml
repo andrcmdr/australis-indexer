@@ -12,7 +12,7 @@ license = "GPLv3"
 publish = false
 
 [dependencies]
-borealis-types = { git = "ssh://git@github.com/aurora-is-near/borealis.rs.git", rev = "89cecc1539af3a7ed8ee4ff613d5c3dc24c488c0" }
+borealis-types = { git = "ssh://git@github.com/aurora-is-near/borealis.rs.git", rev = "db7020e66fb5c31f98e135ae02c8a8b71710cfcc" }
 nats = "0.16.0"
 
 clap = "3.0.0-beta.1"
@@ -37,4 +37,3 @@ rand = "0.8.4"
 [target]
 
 [features]
-

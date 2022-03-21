@@ -1,15 +1,16 @@
-use borealis_types::prelude::BorealisMessage;
+use borealis_types::types::BorealisMessage;
 use clap::Clap;
 use configs::{
-    init_logging, AwaitSynced, MsgFormat, Opts, RunArgs, SubCommand, SyncMode, VerbosityLevel, Error,
+    init_logging, AwaitSynced, Error, MsgFormat, Opts, RunArgs, SubCommand, SyncMode,
+    VerbosityLevel,
 };
+use core::sync::atomic::{AtomicUsize, Ordering};
 use nats;
 use near_indexer;
 use serde_cbor as cbor;
 use serde_json;
-use tokio::sync::{mpsc, broadcast};
 use tokio::runtime;
-use core::sync::atomic::{AtomicUsize, Ordering};
+use tokio::sync::{broadcast, mpsc};
 use tracing::info;
 
 pub mod configs;
@@ -269,27 +270,38 @@ async fn message_producer(
                 Ok(nats_connection) => Ok(nats_connection),
                 Err(_error) => actual_connection_rx.recv().await,
             }
-        }.unwrap().connection.unwrap();
+        }
+        .unwrap()
+        .connection
+        .unwrap();
 
         info!(target: "borealis_indexer", "Message Producer: Nats Connection: {:?}", nats_connection.to_owned());
 
         // Stream message to NATS
         match msg_format {
             MsgFormat::Cbor => {
-                nats_connection.publish(
-                    format!("{}_{}", subject, msg_format.to_string()).as_str(),
-                    BorealisMessage::new(streamer_message.block.header.height, &streamer_message)
+                nats_connection
+                    .publish(
+                        format!("{}_{}", subject, msg_format.to_string()).as_str(),
+                        BorealisMessage::new(
+                            streamer_message.block.header.height,
+                            &streamer_message,
+                        )
                         .to_cbor(),
-                )
-                .expect("[CBOR bytes vector] Message passing error");
+                    )
+                    .expect("[CBOR bytes vector] Message passing error");
             }
             MsgFormat::Json => {
-                nats_connection.publish(
-                    format!("{}_{}", subject, msg_format.to_string()).as_str(),
-                    BorealisMessage::new(streamer_message.block.header.height, &streamer_message)
+                nats_connection
+                    .publish(
+                        format!("{}_{}", subject, msg_format.to_string()).as_str(),
+                        BorealisMessage::new(
+                            streamer_message.block.header.height,
+                            &streamer_message,
+                        )
                         .to_json_bytes(),
-                )
-                .expect("[JSON bytes vector] Message passing error");
+                    )
+                    .expect("[JSON bytes vector] Message passing error");
             }
         }
 
@@ -400,19 +412,16 @@ async fn message_producer(
                     "shard_receipt_execution_outcomes: {:?}\n",
                     cbor::to_vec(&shard.receipt_execution_outcomes).unwrap()
                 );
-            });
 
-            println!("StateChanges#: {}\n", streamer_message.state_changes.len());
-            streamer_message
-                .state_changes
-                .iter()
-                .for_each(|state_change| {
+                println!("StateChanges#: {}\n", shard.state_changes.len());
+                shard.state_changes.iter().for_each(|state_change| {
                     println!(
                         "StateChange: {}\n",
                         serde_json::to_value(&state_change).unwrap()
                     );
                     println!("StateChange: {:?}\n", cbor::to_vec(&state_change).unwrap());
                 });
+            });
         };
     }
 }
@@ -434,8 +443,8 @@ struct NATSConnection {
 }
 
 impl NATSConnection
-    where
-        Self: Send + Sync + 'static,
+where
+    Self: Send + Sync + 'static,
 {
     fn new() -> NATSConnection {
         let cid = CID.load(Ordering::SeqCst);
@@ -447,11 +456,15 @@ impl NATSConnection
     }
 
     /// Create options for connection to Borealis NATS Bus
-    fn options(self, connect_args: RunArgs, connection_event_tx: mpsc::Sender<ConnectionEvent>) -> nats::Options {
+    fn options(
+        self,
+        connect_args: RunArgs,
+        connection_event_tx: mpsc::Sender<ConnectionEvent>,
+    ) -> nats::Options {
         let connection_reestablished_event = connection_event_tx.clone();
         let connection_lost_event = connection_event_tx.clone();
         let connection_closed_event = connection_event_tx.clone();
-        
+
         let creds_path = connect_args
             .creds_path
             .unwrap_or(std::path::PathBuf::from("./.nats/seed/nats.creds"));
@@ -461,47 +474,51 @@ impl NATSConnection
             connect_args.client_cert_path,
             connect_args.client_private_key,
         ) {
-            (Some(root_cert_path), None, None) => {
-                nats::Options::with_credentials(creds_path)
-                    .with_name("Borealis Indexer [TLS, Server Auth]")
-                    .tls_required(true)
-                    .add_root_certificate(root_cert_path)
-                    .reconnect_buffer_size(1024 * 1024 * 1024)
-                    .max_reconnects(100000)
-                    .reconnect_delay_callback(|reconnect_try| {
-                        let reconnect_attempt = {
-                            if reconnect_try == 0 {
-                                1 as usize
-                            } else {
-                                reconnect_try
-                            }
-                        };
-                        let delay = core::time::Duration::from_millis(std::cmp::min(
-                            (reconnect_attempt
-                                * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
-                                as u64,
-                            1000,
-                        ));
-                        info!(
-                            target: "borealis_indexer",
-                            "reconnection attempt #{} within delay of {:?} ...",
-                            reconnect_attempt, delay
-                        );
-                        delay
-                    })
-                    .reconnect_callback( move || {
-                        info!(target: "borealis_indexer", "connection has been reestablished");
-                        connection_reestablished_event.blocking_send(ConnectionEvent::ConnectionReestablished).unwrap();
-                    })
-                    .disconnect_callback( move || {
-                        info!(target: "borealis_indexer", "connection has been lost");
-                        connection_lost_event.blocking_send(ConnectionEvent::ConnectionLost).unwrap();
-                    })
-                    .close_callback(move || {
-                        info!(target: "borealis_indexer", "connection has been closed");
-                        connection_closed_event.blocking_send(ConnectionEvent::ConnectionClosed).unwrap();
-                    })
-            }
+            (Some(root_cert_path), None, None) => nats::Options::with_credentials(creds_path)
+                .with_name("Borealis Indexer [TLS, Server Auth]")
+                .tls_required(true)
+                .add_root_certificate(root_cert_path)
+                .reconnect_buffer_size(1024 * 1024 * 1024)
+                .max_reconnects(100000)
+                .reconnect_delay_callback(|reconnect_try| {
+                    let reconnect_attempt = {
+                        if reconnect_try == 0 {
+                            1 as usize
+                        } else {
+                            reconnect_try
+                        }
+                    };
+                    let delay = core::time::Duration::from_millis(std::cmp::min(
+                        (reconnect_attempt
+                            * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
+                            as u64,
+                        1000,
+                    ));
+                    info!(
+                        target: "borealis_indexer",
+                        "reconnection attempt #{} within delay of {:?} ...",
+                        reconnect_attempt, delay
+                    );
+                    delay
+                })
+                .reconnect_callback(move || {
+                    info!(target: "borealis_indexer", "connection has been reestablished");
+                    connection_reestablished_event
+                        .blocking_send(ConnectionEvent::ConnectionReestablished)
+                        .unwrap();
+                })
+                .disconnect_callback(move || {
+                    info!(target: "borealis_indexer", "connection has been lost");
+                    connection_lost_event
+                        .blocking_send(ConnectionEvent::ConnectionLost)
+                        .unwrap();
+                })
+                .close_callback(move || {
+                    info!(target: "borealis_indexer", "connection has been closed");
+                    connection_closed_event
+                        .blocking_send(ConnectionEvent::ConnectionClosed)
+                        .unwrap();
+                }),
             (Some(root_cert_path), Some(client_cert_path), Some(client_private_key)) => {
                 nats::Options::with_credentials(creds_path)
                     .with_name("Borealis Indexer [TLS, Server Auth, Client Auth]")
@@ -531,99 +548,140 @@ impl NATSConnection
                         );
                         delay
                     })
-                    .reconnect_callback( move || {
+                    .reconnect_callback(move || {
                         info!(target: "borealis_indexer", "connection has been reestablished");
-                        connection_reestablished_event.blocking_send(ConnectionEvent::ConnectionReestablished).unwrap();
+                        connection_reestablished_event
+                            .blocking_send(ConnectionEvent::ConnectionReestablished)
+                            .unwrap();
                     })
-                    .disconnect_callback( move || {
+                    .disconnect_callback(move || {
                         info!(target: "borealis_indexer", "connection has been lost");
-                        connection_lost_event.blocking_send(ConnectionEvent::ConnectionLost).unwrap();
+                        connection_lost_event
+                            .blocking_send(ConnectionEvent::ConnectionLost)
+                            .unwrap();
                     })
                     .close_callback(move || {
                         info!(target: "borealis_indexer", "connection has been closed");
-                        connection_closed_event.blocking_send(ConnectionEvent::ConnectionClosed).unwrap();
+                        connection_closed_event
+                            .blocking_send(ConnectionEvent::ConnectionClosed)
+                            .unwrap();
                     })
-           }
-            _ => {
-                nats::Options::with_credentials(creds_path)
-                    .with_name("Borealis Indexer [NATS, without TLS]")
-                    .reconnect_buffer_size(1024 * 1024 * 1024)
-                    .max_reconnects(100000)
-                    .reconnect_delay_callback(|reconnect_try| {
-                        let reconnect_attempt = {
-                            if reconnect_try == 0 {
-                                1 as usize
-                            } else {
-                                reconnect_try
-                            }
-                        };
-                        let delay = core::time::Duration::from_millis(std::cmp::min(
-                            (reconnect_attempt
-                                * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
-                                as u64,
-                            1000,
-                        ));
-                        info!(
-                            target: "borealis_indexer",
-                            "reconnection attempt #{} within delay of {:?} ...",
-                            reconnect_attempt, delay
-                        );
-                        delay
-                    })
-                    .reconnect_callback( move || {
-                        info!(target: "borealis_indexer", "connection has been reestablished");
-                        connection_reestablished_event.blocking_send(ConnectionEvent::ConnectionReestablished).unwrap();
-                    })
-                    .disconnect_callback( move || {
-                        info!(target: "borealis_indexer", "connection has been lost");
-                        connection_lost_event.blocking_send(ConnectionEvent::ConnectionLost).unwrap();
-                    })
-                    .close_callback(move || {
-                        info!(target: "borealis_indexer", "connection has been closed");
-                        connection_closed_event.blocking_send(ConnectionEvent::ConnectionClosed).unwrap();
-                    })
-           }
+            }
+            _ => nats::Options::with_credentials(creds_path)
+                .with_name("Borealis Indexer [NATS, without TLS]")
+                .reconnect_buffer_size(1024 * 1024 * 1024)
+                .max_reconnects(100000)
+                .reconnect_delay_callback(|reconnect_try| {
+                    let reconnect_attempt = {
+                        if reconnect_try == 0 {
+                            1 as usize
+                        } else {
+                            reconnect_try
+                        }
+                    };
+                    let delay = core::time::Duration::from_millis(std::cmp::min(
+                        (reconnect_attempt
+                            * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
+                            as u64,
+                        1000,
+                    ));
+                    info!(
+                        target: "borealis_indexer",
+                        "reconnection attempt #{} within delay of {:?} ...",
+                        reconnect_attempt, delay
+                    );
+                    delay
+                })
+                .reconnect_callback(move || {
+                    info!(target: "borealis_indexer", "connection has been reestablished");
+                    connection_reestablished_event
+                        .blocking_send(ConnectionEvent::ConnectionReestablished)
+                        .unwrap();
+                })
+                .disconnect_callback(move || {
+                    info!(target: "borealis_indexer", "connection has been lost");
+                    connection_lost_event
+                        .blocking_send(ConnectionEvent::ConnectionLost)
+                        .unwrap();
+                })
+                .close_callback(move || {
+                    info!(target: "borealis_indexer", "connection has been closed");
+                    connection_closed_event
+                        .blocking_send(ConnectionEvent::ConnectionClosed)
+                        .unwrap();
+                }),
         };
         options
     }
 
     /// Create connection to Borealis NATS Bus
-    fn connect(connect_args: RunArgs, connection_event_tx: mpsc::Sender<ConnectionEvent>, actual_connection_tx: broadcast::Sender<NATSConnection>) -> Result<Self, Error> {
+    fn connect(
+        connect_args: RunArgs,
+        connection_event_tx: mpsc::Sender<ConnectionEvent>,
+        actual_connection_tx: broadcast::Sender<NATSConnection>,
+    ) -> Result<Self, Error> {
         let nats_connection_initial = NATSConnection::new();
-        let connection_options = nats_connection_initial.options(connect_args.to_owned(), connection_event_tx);
+        let connection_options =
+            nats_connection_initial.options(connect_args.to_owned(), connection_event_tx);
 
         match connection_options.connect(connect_args.nats_server.as_str()) {
             Ok(nats_connection) => {
                 let connection_id = CID.fetch_add(1, Ordering::SeqCst);
                 let cid = CID.load(Ordering::SeqCst);
                 info!(target: "borealis_indexer", "Connect: CID: {}, {}; Nats Connection: {:?}", connection_id.clone(), cid.clone(), nats_connection.to_owned());
-                actual_connection_tx.send(Self { cid: cid.clone(), connection: Some(nats_connection.clone()) }).unwrap();
-                return Ok(Self { cid, connection: Some(nats_connection) })
-            },
-            Err(error) => Err(format!("NATS connection error or wrong credentials: {:?}", error).into()),
+                actual_connection_tx
+                    .send(Self {
+                        cid: cid.clone(),
+                        connection: Some(nats_connection.clone()),
+                    })
+                    .unwrap();
+                return Ok(Self {
+                    cid,
+                    connection: Some(nats_connection),
+                });
+            }
+            Err(error) => {
+                Err(format!("NATS connection error or wrong credentials: {:?}", error).into())
+            }
         }
     }
 
     /// Use already existed connection to Borealis NATS Bus or recreate new connection to prevent connection issues
-    fn try_connect(self, connect_args: RunArgs, connection_event_tx: mpsc::Sender<ConnectionEvent>, actual_connection_tx: broadcast::Sender<NATSConnection>) -> Result<Self, Error> {
+    fn try_connect(
+        self,
+        connect_args: RunArgs,
+        connection_event_tx: mpsc::Sender<ConnectionEvent>,
+        actual_connection_tx: broadcast::Sender<NATSConnection>,
+    ) -> Result<Self, Error> {
         let nats_connection_initial = NATSConnection::new();
-        let connection_options = nats_connection_initial.options(connect_args.to_owned(), connection_event_tx);
+        let connection_options =
+            nats_connection_initial.options(connect_args.to_owned(), connection_event_tx);
 
         if let Ok(rtt_duration) = self.connection.as_ref().unwrap().rtt() {
             // info!(target: "borealis_indexer", "NATS Connection: {:?}", connection.unwrap());
             info!(target: "borealis_indexer", "round trip time (rtt) between this client and the current NATS server: {:?}", rtt_duration);
             actual_connection_tx.send(self.clone()).unwrap();
-            return Ok(self)
+            return Ok(self);
         } else {
             match connection_options.connect(connect_args.nats_server.as_str()) {
                 Ok(nats_connection) => {
                     let connection_id = CID.fetch_add(1, Ordering::SeqCst);
                     let cid = CID.load(Ordering::SeqCst);
                     info!(target: "borealis_indexer", "Reconnect: CID: {}, {}; Nats Connection: {:?}", connection_id.clone(), cid.clone(), nats_connection.to_owned());
-                    actual_connection_tx.send(Self { cid: cid.clone(), connection: Some(nats_connection.clone()) }).unwrap();
-                    return Ok(Self { cid, connection: Some(nats_connection) })
-                },
-                Err(error) => Err(format!("NATS connection error or wrong credentials: {:?}", error).into()),
+                    actual_connection_tx
+                        .send(Self {
+                            cid: cid.clone(),
+                            connection: Some(nats_connection.clone()),
+                        })
+                        .unwrap();
+                    return Ok(Self {
+                        cid,
+                        connection: Some(nats_connection),
+                    });
+                }
+                Err(error) => {
+                    Err(format!("NATS connection error or wrong credentials: {:?}", error).into())
+                }
             }
         }
     }
@@ -703,7 +761,7 @@ fn main() -> Result<(), Error> {
         } else {
             let events_processing = runtime::Builder::new_multi_thread()
                 .enable_all()
-                .thread_name_fn( || {
+                .thread_name_fn(|| {
                     static THREAD_ID: AtomicUsize = AtomicUsize::new(0);
                     let thread_id = THREAD_ID.fetch_add(1, Ordering::SeqCst);
                     format!("connection-events-processing-{}", thread_id)
@@ -712,7 +770,7 @@ fn main() -> Result<(), Error> {
 
             let messages_processing = runtime::Builder::new_multi_thread()
                 .enable_all()
-                .thread_name_fn( || {
+                .thread_name_fn(|| {
                     static THREAD_ID: AtomicUsize = AtomicUsize::new(0);
                     let thread_id = THREAD_ID.fetch_add(1, Ordering::SeqCst);
                     format!("streamer-messages-processing-{}", thread_id)
@@ -781,9 +839,20 @@ fn main() -> Result<(), Error> {
 
     match opts.subcmd {
         SubCommand::Check(run_args) => {
-            let nats_connection = NATSConnection::connect(run_args.to_owned(), connection_event_sender.clone(),  actual_connection_sender.clone()).unwrap();
+            let nats_connection = NATSConnection::connect(
+                run_args.to_owned(),
+                connection_event_sender.clone(),
+                actual_connection_sender.clone(),
+            )
+            .unwrap();
             info!(target: "borealis_indexer", "Main(): Check: Nats Connection: {:?}", nats_connection.to_owned());
-            let nats_connection_actual = nats_connection.try_connect(run_args.to_owned(), connection_event_sender.clone(), actual_connection_sender.clone()).unwrap();
+            let nats_connection_actual = nats_connection
+                .try_connect(
+                    run_args.to_owned(),
+                    connection_event_sender.clone(),
+                    actual_connection_sender.clone(),
+                )
+                .unwrap();
             info!(target: "borealis_indexer", "Main(): Check: Nats Connection actual: {:?}", nats_connection_actual.to_owned());
             nats_connection_actual.nats_check_connection();
         }
@@ -813,9 +882,20 @@ fn main() -> Result<(), Error> {
                 },
             };
 
-            let nats_connection = NATSConnection::connect(run_args.to_owned(), connection_event_sender.clone(),  actual_connection_sender.clone()).unwrap();
+            let nats_connection = NATSConnection::connect(
+                run_args.to_owned(),
+                connection_event_sender.clone(),
+                actual_connection_sender.clone(),
+            )
+            .unwrap();
             info!(target: "borealis_indexer", "Main(): Run: Nats Connection: {:?}", nats_connection.to_owned());
-            let nats_connection_actual = nats_connection.try_connect(run_args.to_owned(), connection_event_sender.clone(), actual_connection_sender.clone()).unwrap();
+            let nats_connection_actual = nats_connection
+                .try_connect(
+                    run_args.to_owned(),
+                    connection_event_sender.clone(),
+                    actual_connection_sender.clone(),
+                )
+                .unwrap();
             info!(target: "borealis_indexer", "Main(): Run: Nats Connection actual: {:?}", nats_connection_actual.to_owned());
             nats_connection_actual.to_owned().nats_check_connection();
 
@@ -825,13 +905,16 @@ fn main() -> Result<(), Error> {
 
                 let events_stream = indexer.streamer();
 
-                tokio::spawn(async move { message_producer(
-                    events_stream,
-                    actual_connection_receiver,
-                    run_args.subject,
-                    run_args.msg_format,
-                    opts.verbose,
-                ).await});
+                tokio::spawn(async move {
+                    message_producer(
+                        events_stream,
+                        actual_connection_receiver,
+                        run_args.subject,
+                        run_args.msg_format,
+                        opts.verbose,
+                    )
+                    .await
+                });
             });
         }
     }

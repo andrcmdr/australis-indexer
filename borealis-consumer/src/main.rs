@@ -7,7 +7,7 @@ use nats::jetstream::{
     RetentionPolicy, StorageType, StreamConfig,
 };
 // use near_indexer::StreamerMessage;
-use borealis_types::prelude::{BorealisMessage, StreamerMessage};
+use borealis_types::types::{BorealisMessage, StreamerMessage};
 use serde_cbor as cbor;
 use serde_json;
 use tracing::info;
@@ -381,19 +381,16 @@ fn message_consumer(
                 "shard_receipt_execution_outcomes: {:?}\n",
                 cbor::to_vec(&shard.receipt_execution_outcomes).unwrap()
             );
-        });
 
-        println!("StateChanges#: {}\n", streamer_message.state_changes.len());
-        streamer_message
-            .state_changes
-            .iter()
-            .for_each(|state_change| {
+            println!("StateChanges#: {}\n", shard.state_changes.len());
+            shard.state_changes.iter().for_each(|state_change| {
                 println!(
                     "StateChange: {}\n",
                     serde_json::to_value(&state_change).unwrap()
                 );
                 println!("StateChange: {:?}\n", cbor::to_vec(&state_change).unwrap());
             });
+        });
     };
 }
 
