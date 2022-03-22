@@ -4,7 +4,7 @@ use tracing_subscriber::EnvFilter;
 
 use core::str::FromStr;
 
-pub type Error = Box<dyn std::error::Error + 'static>;
+pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 /// CLI options (subcommands and flags)
 #[derive(Clap, Debug)]

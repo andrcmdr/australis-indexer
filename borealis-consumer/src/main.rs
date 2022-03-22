@@ -232,21 +232,21 @@ fn message_consumer(
                             },
                         },
                     ],
-                },
-            ],
-            state_changes: [
-                StateChangeWithCauseView {
-                    cause: ValidatorAccountsUpdate,
-                    value: AccountUpdate {
-                        account_id: "test.near",
-                        account: AccountView {
-                            amount: 1000000000000000000000000000000000,
-                            locked: 50000000000000000000000000000000,
-                            code_hash: `11111111111111111111111111111111`,
-                            storage_usage: 182,
-                            storage_paid_at: 0,
+                    state_changes: [
+                        StateChangeWithCauseView {
+                            cause: ValidatorAccountsUpdate,
+                            value: AccountUpdate {
+                                account_id: "test.near",
+                                account: AccountView {
+                                    amount: 1000000000000000000000000000000000,
+                                    locked: 50000000000000000000000000000000,
+                                    code_hash: `11111111111111111111111111111111`,
+                                    storage_usage: 182,
+                                    storage_paid_at: 0,
+                                },
+                            },
                         },
-                    },
+                    ],
                 },
             ],
         }
