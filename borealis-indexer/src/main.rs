@@ -1,3 +1,4 @@
+use actix;
 use borealis_types::types::BorealisMessage;
 use clap::Clap;
 use configs::{
@@ -11,7 +12,6 @@ use serde_cbor as cbor;
 use serde_json;
 // use tokio::runtime;
 use tokio::sync::{mpsc, watch};
-use actix;
 use tracing::info;
 
 pub mod configs;
@@ -270,64 +270,56 @@ async fn message_producer(
 
         // Stream message to NATS
         match msg_format {
-            MsgFormat::Cbor => {
-                loop {
-                    let nats_connection = actual_connection_rx.borrow().clone();
-                    info!(target: "borealis_indexer", "Message Producer [CBOR bytes vector]: Current Connection: NATS Connection: {:?}", nats_connection.clone());
+            MsgFormat::Cbor => loop {
+                let nats_connection = actual_connection_rx.borrow().clone();
+                info!(target: "borealis_indexer", "Message Producer [CBOR bytes vector]: Current Connection: NATS Connection: {:?}", nats_connection.clone());
 
-                    let status = nats_connection.connection.clone().unwrap()
-                        .publish(
-                            format!("{}_{}", subject, msg_format.to_string()).as_str(),
-                            BorealisMessage::new(
-                                streamer_message.block.header.height,
-                                &streamer_message,
-                            )
-                            .to_cbor(),
-                        );
+                let status = nats_connection.connection.clone().unwrap().publish(
+                    format!("{}_{}", subject, msg_format.to_string()).as_str(),
+                    BorealisMessage::new(streamer_message.block.header.height, &streamer_message)
+                        .to_cbor(),
+                );
 
-                    match status {
-                        Ok(()) => {
-                            info!(target: "borealis_indexer", "Message Producer [CBOR bytes vector]: Actual Connection: NATS Connection: {:?}", nats_connection.clone());
-                            break;
-                        },
-                        Err(error) => {
-                            info!(target: "borealis_indexer", "Message Producer [CBOR bytes vector]: Message passing error, NATS connection error or wrong credentials: {:?}", error);
-                            let _result = connection_event_tx.send(ConnectionEvent::NewConnectionRequest).await;
-                            tokio::time::sleep(core::time::Duration::from_millis(500)).await;
-                            continue;
-                        },
+                match status {
+                    Ok(()) => {
+                        info!(target: "borealis_indexer", "Message Producer [CBOR bytes vector]: Actual Connection: NATS Connection: {:?}", nats_connection.clone());
+                        break;
                     }
-                };
-            }
-            MsgFormat::Json => {
-                loop {
-                    let nats_connection = actual_connection_rx.borrow().clone();
-                    info!(target: "borealis_indexer", "Message Producer [JSON bytes vector]: Current Connection: NATS Connection: {:?}", nats_connection.clone());
-
-                    let status = nats_connection.connection.clone().unwrap()
-                        .publish(
-                            format!("{}_{}", subject, msg_format.to_string()).as_str(),
-                            BorealisMessage::new(
-                                streamer_message.block.header.height,
-                                &streamer_message,
-                            )
-                            .to_json_bytes(),
-                        );
-
-                    match status {
-                        Ok(()) => {
-                            info!(target: "borealis_indexer", "Message Producer [JSON bytes vector]: Actual Connection: NATS Connection: {:?}", nats_connection.clone());
-                            break;
-                        },
-                        Err(error) => {
-                            info!(target: "borealis_indexer", "Message Producer [JSON bytes vector]: Message passing error, NATS connection error or wrong credentials: {:?}", error);
-                            let _result = connection_event_tx.send(ConnectionEvent::NewConnectionRequest).await;
-                            tokio::time::sleep(core::time::Duration::from_millis(500)).await;
-                            continue;
-                        },
+                    Err(error) => {
+                        info!(target: "borealis_indexer", "Message Producer [CBOR bytes vector]: Message passing error, NATS connection error or wrong credentials: {:?}", error);
+                        let _result = connection_event_tx
+                            .send(ConnectionEvent::NewConnectionRequest)
+                            .await;
+                        tokio::time::sleep(core::time::Duration::from_millis(500)).await;
+                        continue;
                     }
-                };
-            }
+                }
+            },
+            MsgFormat::Json => loop {
+                let nats_connection = actual_connection_rx.borrow().clone();
+                info!(target: "borealis_indexer", "Message Producer [JSON bytes vector]: Current Connection: NATS Connection: {:?}", nats_connection.clone());
+
+                let status = nats_connection.connection.clone().unwrap().publish(
+                    format!("{}_{}", subject, msg_format.to_string()).as_str(),
+                    BorealisMessage::new(streamer_message.block.header.height, &streamer_message)
+                        .to_json_bytes(),
+                );
+
+                match status {
+                    Ok(()) => {
+                        info!(target: "borealis_indexer", "Message Producer [JSON bytes vector]: Actual Connection: NATS Connection: {:?}", nats_connection.clone());
+                        break;
+                    }
+                    Err(error) => {
+                        info!(target: "borealis_indexer", "Message Producer [JSON bytes vector]: Message passing error, NATS connection error or wrong credentials: {:?}", error);
+                        let _result = connection_event_tx
+                            .send(ConnectionEvent::NewConnectionRequest)
+                            .await;
+                        tokio::time::sleep(core::time::Duration::from_millis(500)).await;
+                        continue;
+                    }
+                }
+            },
         }
 
         // Data handling from `StreamerMessage` data structure. For custom filtering purposes.
@@ -477,77 +469,87 @@ where
                     loop {
                         let nats_connection = actual_connection_rx.borrow().clone();
                         info!(target: "borealis_indexer", "Events Processing: Current Connection: NATS Connection: {:?}", nats_connection.clone());
-                        match nats_connection.try_connect(connect_args.to_owned(), connection_event_tx.clone()) {
+                        match nats_connection
+                            .try_connect(connect_args.to_owned(), connection_event_tx.clone())
+                        {
                             Ok(nats_connection_actual) => {
                                 info!(target: "borealis_indexer", "Events Processing: Actual Connection: NATS Connection: {:?}", nats_connection_actual.clone());
                                 let _result = actual_connection_tx.send(nats_connection_actual);
                                 break;
-                            },
+                            }
                             Err(error) => {
                                 info!(target: "borealis_indexer", "Events Processing: NATS connection error or wrong credentials: {:?}", error);
                                 tokio::time::sleep(core::time::Duration::from_millis(500)).await;
                                 continue;
-                            },
+                            }
                         }
-                    };
-                },
+                    }
+                }
                 ConnectionEvent::ConnectionReestablished => {
                     info!(target: "borealis_indexer", "Connection has been reestablished, checking current connection is active and workable, otherwise creation of new connection...");
                     loop {
                         let nats_connection = actual_connection_rx.borrow().clone();
                         info!(target: "borealis_indexer", "Events Processing: Current Connection: NATS Connection: {:?}", nats_connection.clone());
-                        match nats_connection.try_connect(connect_args.to_owned(), connection_event_tx.clone()) {
+                        match nats_connection
+                            .try_connect(connect_args.to_owned(), connection_event_tx.clone())
+                        {
                             Ok(nats_connection_actual) => {
                                 info!(target: "borealis_indexer", "Events Processing: Actual Connection: NATS Connection: {:?}", nats_connection_actual.clone());
                                 let _result = actual_connection_tx.send(nats_connection_actual);
                                 break;
-                            },
+                            }
                             Err(error) => {
                                 info!(target: "borealis_indexer", "Events Processing: NATS connection error or wrong credentials: {:?}", error);
                                 tokio::time::sleep(core::time::Duration::from_millis(500)).await;
                                 continue;
-                            },
+                            }
                         }
-                    };
-                },
+                    }
+                }
                 ConnectionEvent::ConnectionLost => {
                     info!(target: "borealis_indexer", "Connection has been lost, retrieving connection...");
                     loop {
                         let nats_connection = actual_connection_rx.borrow().clone();
                         info!(target: "borealis_indexer", "Events Processing: Current Connection: NATS Connection: {:?}", nats_connection.clone());
-                        match NATSConnection::connect(connect_args.to_owned(), connection_event_tx.clone()) {
+                        match NATSConnection::connect(
+                            connect_args.to_owned(),
+                            connection_event_tx.clone(),
+                        ) {
                             Ok(nats_connection_actual) => {
                                 info!(target: "borealis_indexer", "Events Processing: Actual Connection: NATS Connection: {:?}", nats_connection_actual.clone());
                                 let _result = actual_connection_tx.send(nats_connection_actual);
                                 break;
-                            },
+                            }
                             Err(error) => {
                                 info!(target: "borealis_indexer", "Events Processing: NATS connection error or wrong credentials: {:?}", error);
                                 tokio::time::sleep(core::time::Duration::from_millis(500)).await;
                                 continue;
-                            },
+                            }
                         }
-                    };
-                },
+                    }
+                }
                 ConnectionEvent::ConnectionClosed => {
                     info!(target: "borealis_indexer", "Connection has been closed, retrieving connection...");
                     loop {
                         let nats_connection = actual_connection_rx.borrow().clone();
                         info!(target: "borealis_indexer", "Events Processing: Current Connection: NATS Connection: {:?}", nats_connection.clone());
-                        match NATSConnection::connect(connect_args.to_owned(), connection_event_tx.clone()) {
+                        match NATSConnection::connect(
+                            connect_args.to_owned(),
+                            connection_event_tx.clone(),
+                        ) {
                             Ok(nats_connection_actual) => {
                                 info!(target: "borealis_indexer", "Events Processing: Actual Connection: NATS Connection: {:?}", nats_connection_actual.clone());
                                 let _result = actual_connection_tx.send(nats_connection_actual);
                                 break;
-                            },
+                            }
                             Err(error) => {
                                 info!(target: "borealis_indexer", "Events Processing: NATS connection error or wrong credentials: {:?}", error);
                                 tokio::time::sleep(core::time::Duration::from_millis(500)).await;
                                 continue;
-                            },
+                            }
                         }
-                    };
-                },
+                    }
+                }
             }
         }
     }
@@ -564,15 +566,17 @@ where
                 Ok(()) => {
                     info!(target: "borealis_indexer", "Events Processing Check: Actual Connection: NATS Connection: {:?}", nats_connection.clone());
                     break;
-                },
+                }
                 Err(error) => {
                     info!(target: "borealis_indexer", "Events Processing Check: NATS connection error or wrong credentials: {:?}", error);
-                    connection_event_sender.blocking_send(ConnectionEvent::NewConnectionRequest).unwrap();
+                    connection_event_sender
+                        .blocking_send(ConnectionEvent::NewConnectionRequest)
+                        .unwrap();
                     std::thread::sleep(core::time::Duration::from_millis(500));
                     continue;
-                },
+                }
             }
-        };
+        }
     }
 }
 
@@ -776,9 +780,11 @@ where
                     connection: Some(nats_connection),
                 });
             }
-            Err(error) => {
-                Err(format!("Connect: NATS connection error or wrong credentials: {:?}", error).into())
-            }
+            Err(error) => Err(format!(
+                "Connect: NATS connection error or wrong credentials: {:?}",
+                error
+            )
+            .into()),
         }
     }
 
@@ -807,9 +813,11 @@ where
                         connection: Some(nats_connection),
                     });
                 }
-                Err(error) => {
-                    Err(format!("Reconnect: NATS connection error or wrong credentials: {:?}", error).into())
-                }
+                Err(error) => Err(format!(
+                    "Reconnect: NATS connection error or wrong credentials: {:?}",
+                    error
+                )
+                .into()),
             }
         }
     }
@@ -825,10 +833,12 @@ where
                 info!(target: "borealis_indexer", "this client ID, as known by the current NATS server: {:?}", nats_connection.client_id());
                 info!(target: "borealis_indexer", "maximum payload size the current NATS server will accept: {:?}", nats_connection.max_payload());
                 Ok(())
-            },
-            Err(error) => {
-                Err(format!("Check Connection: NATS connection error or wrong credentials: {:?}", error).into())
-            },
+            }
+            Err(error) => Err(format!(
+                "Check Connection: NATS connection error or wrong credentials: {:?}",
+                error
+            )
+            .into()),
         }
     }
 }
@@ -923,34 +933,32 @@ fn main() -> Result<(), Error> {
     let messages_processing_rt = actix::System::new();
 
     let (connection_event_tx, connection_event_rx) = mpsc::channel::<ConnectionEvent>(1);
-    let (actual_connection_tx, actual_connection_rx) = watch::channel::<NATSConnection>(NATSConnection::new());
+    let (actual_connection_tx, actual_connection_rx) =
+        watch::channel::<NATSConnection>(NATSConnection::new());
 
     let connection_event_sender = connection_event_tx.clone();
     let actual_connection_receiver = actual_connection_tx.subscribe();
 
     if let SubCommand::Check(run_args) | SubCommand::Run(run_args) = opts.subcmd.clone() {
-
         loop {
             match NATSConnection::connect(run_args.to_owned(), connection_event_tx.clone()) {
                 Ok(nats_connection) => {
                     info!(target: "borealis_indexer", "Main(): Connect with extended options: NATS Connection: {:?}", nats_connection.clone());
                     let _result = actual_connection_tx.send(nats_connection);
                     break;
-                },
+                }
                 Err(error) => {
                     info!(target: "borealis_indexer", "Main(): Connect with extended options: NATS connection error or wrong credentials: {:?}", error);
                     std::thread::sleep(core::time::Duration::from_millis(500));
                     continue;
-                },
+                }
             }
-        };
+        }
     };
 
     match opts.subcmd {
         SubCommand::Check(run_args) => {
-
             messages_processing_rt.block_on(async move {
-
                 actix::spawn(async move {
                     ConnectionEvent::events_processing(
                         connection_event_tx,
@@ -958,13 +966,16 @@ fn main() -> Result<(), Error> {
                         actual_connection_tx,
                         actual_connection_rx,
                         run_args,
-                    ).await;
+                    )
+                    .await;
                 });
 
-                ConnectionEvent::events_processing_check(actual_connection_receiver.clone(), connection_event_sender.clone());
+                ConnectionEvent::events_processing_check(
+                    actual_connection_receiver.clone(),
+                    connection_event_sender.clone(),
+                );
 
                 actix::System::current().stop();
-
             });
             messages_processing_rt.run().unwrap();
         }
@@ -997,7 +1008,6 @@ fn main() -> Result<(), Error> {
             let connect_args = run_args.clone();
 
             messages_processing_rt.block_on(async move {
-
                 actix::spawn(async move {
                     ConnectionEvent::events_processing(
                         connection_event_tx,
@@ -1005,10 +1015,14 @@ fn main() -> Result<(), Error> {
                         actual_connection_tx,
                         actual_connection_rx,
                         connect_args,
-                    ).await;
+                    )
+                    .await;
                 });
 
-                ConnectionEvent::events_processing_check(actual_connection_receiver.clone(), connection_event_sender.clone());
+                ConnectionEvent::events_processing_check(
+                    actual_connection_receiver.clone(),
+                    connection_event_sender.clone(),
+                );
 
                 let indexer = near_indexer::Indexer::new(indexer_config)
                     .expect("Error while creating Indexer instance");
@@ -1023,18 +1037,18 @@ fn main() -> Result<(), Error> {
                         run_args.subject,
                         run_args.msg_format,
                         opts.verbose,
-                    ).await;
+                    )
+                    .await;
                 });
 
                 // actix::System::current().stop();
-
             });
             messages_processing_rt.run().unwrap();
         }
     };
     // Graceful shutdown for all tasks (futures, green threads) currently executed on existed run-time thread-pools
-//  info!(target: "borealis_indexer", "Shutdown process within 10 seconds...");
-//  messages_processing_rt.shutdown_timeout(core::time::Duration::from_secs(10));
-//  events_processing_rt.shutdown_timeout(core::time::Duration::from_secs(10));
+//    info!(target: "borealis_indexer", "Shutdown process within 10 seconds...");
+//    messages_processing_rt.shutdown_timeout(core::time::Duration::from_secs(10));
+//    events_processing_rt.shutdown_timeout(core::time::Duration::from_secs(10));
     Ok(())
 }
