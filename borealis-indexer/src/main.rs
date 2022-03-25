@@ -9,8 +9,9 @@ use nats;
 use near_indexer;
 use serde_cbor as cbor;
 use serde_json;
-use tokio::runtime;
+// use tokio::runtime;
 use tokio::sync::{mpsc, watch};
+use actix;
 use tracing::info;
 
 pub mod configs;
@@ -848,6 +849,7 @@ fn main() -> Result<(), Error> {
         .home_dir
         .unwrap_or(std::path::PathBuf::from("./.borealis-indexer"));
 
+    /*
     let (events_processing_rt, messages_processing_rt) = {
         if let Some(VerbosityLevel::WithRuntimeThreadsDump) = opts.verbose.clone() {
             let events_processing_rt = runtime::Builder::new_multi_thread()
@@ -915,6 +917,10 @@ fn main() -> Result<(), Error> {
             (events_processing_rt, messages_processing_rt)
         }
     };
+    */
+
+    // let events_processing_rt = actix::System::new();
+    let messages_processing_rt = actix::System::new();
 
     let (connection_event_tx, connection_event_rx) = mpsc::channel::<ConnectionEvent>(1);
     let (actual_connection_tx, actual_connection_rx) = watch::channel::<NATSConnection>(NATSConnection::new());
@@ -943,23 +949,24 @@ fn main() -> Result<(), Error> {
     match opts.subcmd {
         SubCommand::Check(run_args) => {
 
-            let events_processing_run = events_processing_rt.spawn(async move {
-                ConnectionEvent::events_processing(
-                    connection_event_tx,
-                    connection_event_rx,
-                    actual_connection_tx,
-                    actual_connection_rx,
-                    run_args,
-                ).await;
-            });
-
             messages_processing_rt.block_on(async move {
 
-                events_processing_run.await.unwrap();
+                actix::spawn(async move {
+                    ConnectionEvent::events_processing(
+                        connection_event_tx,
+                        connection_event_rx,
+                        actual_connection_tx,
+                        actual_connection_rx,
+                        run_args,
+                    ).await;
+                });
 
                 ConnectionEvent::events_processing_check(actual_connection_receiver.clone(), connection_event_sender.clone());
 
+                actix::System::current().stop();
+
             });
+            messages_processing_rt.run().unwrap();
         }
         SubCommand::Init(config_args) => {
             near_indexer::indexer_init_configs(&home_dir, config_args.into())
@@ -989,19 +996,17 @@ fn main() -> Result<(), Error> {
 
             let connect_args = run_args.clone();
 
-            let events_processing_run = events_processing_rt.spawn(async move {
-                ConnectionEvent::events_processing(
-                    connection_event_tx,
-                    connection_event_rx,
-                    actual_connection_tx,
-                    actual_connection_rx,
-                    connect_args,
-                ).await;
-            });
-
             messages_processing_rt.block_on(async move {
 
-                events_processing_run.await.unwrap();
+                actix::spawn(async move {
+                    ConnectionEvent::events_processing(
+                        connection_event_tx,
+                        connection_event_rx,
+                        actual_connection_tx,
+                        actual_connection_rx,
+                        connect_args,
+                    ).await;
+                });
 
                 ConnectionEvent::events_processing_check(actual_connection_receiver.clone(), connection_event_sender.clone());
 
@@ -1010,7 +1015,7 @@ fn main() -> Result<(), Error> {
 
                 let events_stream = indexer.streamer();
 
-                tokio::spawn(async move {
+                actix::spawn(async move {
                     message_producer(
                         events_stream,
                         actual_connection_receiver.clone(),
@@ -1021,12 +1026,15 @@ fn main() -> Result<(), Error> {
                     ).await;
                 });
 
+                // actix::System::current().stop();
+
             });
+            messages_processing_rt.run().unwrap();
         }
     };
     // Graceful shutdown for all tasks (futures, green threads) currently executed on existed run-time thread-pools
-    info!(target: "borealis_indexer", "Shutdown process within 10 seconds...");
-    messages_processing_rt.shutdown_timeout(core::time::Duration::from_secs(10));
-    events_processing_rt.shutdown_timeout(core::time::Duration::from_secs(10));
+//  info!(target: "borealis_indexer", "Shutdown process within 10 seconds...");
+//  messages_processing_rt.shutdown_timeout(core::time::Duration::from_secs(10));
+//  events_processing_rt.shutdown_timeout(core::time::Duration::from_secs(10));
     Ok(())
 }

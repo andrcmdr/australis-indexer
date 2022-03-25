@@ -569,6 +569,7 @@ dependencies = [
 name = "borealis-indexer"
 version = "0.1.0"
 dependencies = [
+ "actix",
  "borealis-types",
  "clap",
  "nats",
