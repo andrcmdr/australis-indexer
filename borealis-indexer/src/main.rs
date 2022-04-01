@@ -464,6 +464,7 @@ enum ConnectionEvent
 where
     Self: Send + Sync,
 {
+    InitialConnectionRequest,
     NewConnectionRequest(NATSConnection),
     ConnectionReestablished(NATSConnection),
     ConnectionLost(NATSConnection),
@@ -483,6 +484,31 @@ where
     ) {
         while let Some(event) = connection_event_rx.recv().await {
             match event {
+                ConnectionEvent::InitialConnectionRequest => {
+                    info!(target: "borealis_indexer", "Initial connection has been requested, creation of initial connection...");
+                    loop {
+                        let result = NATSConnection::connect(connect_args.to_owned(), connection_event_tx.clone());
+                        match &result {
+                            Ok(nats_connection_initial) => {
+                                debug!(target: "borealis_indexer", "Events Processing: Initial Connection: Connect with extended options: NATS Connection: {:?}", nats_connection_initial);
+                                actual_connection_tx.send(nats_connection_initial.clone())
+                                    .unwrap_or_else(|error|
+                                        error!(target: "borealis_indexer", "Events Processing: Initial Connection: Connect with extended options: NATS Connection with CID {} send error: {:?}", nats_connection_initial.cid, error)
+                                    );
+                                drop(nats_connection_initial);
+                                drop(result);
+                                break;
+                            }
+                            Err(error) => {
+                                error!(target: "borealis_indexer", "Events Processing: Initial Connection: Connect with extended options: NATS connection error or wrong credentials: {:?}", error);
+                                drop(error);
+                                drop(result);
+                                tokio::time::sleep(core::time::Duration::from_millis(500)).await;
+                                continue;
+                            }
+                        }
+                    }
+                }
                 ConnectionEvent::NewConnectionRequest(nc) => {
                     info!(target: "borealis_indexer", "New connection has been requested, creation of new connection...");
                     loop {
@@ -501,7 +527,7 @@ where
                                     drop(nats_connection_actual);
                                     drop(result);
                                     drop(nats_connection);
-                                    nc.clone().connection.unwrap().close();
+                                    if let Some(connection) = nc.clone().connection { connection.close() };
                                     drop(nc);
                                     break;
                                 }
@@ -510,7 +536,7 @@ where
                                     drop(error);
                                     drop(result);
                                     drop(nats_connection);
-                                    nc.clone().connection.unwrap().close();
+                                    if let Some(connection) = nc.clone().connection { connection.close() };
                                     drop(nc);
                                     tokio::time::sleep(core::time::Duration::from_millis(500)).await;
                                     continue;
@@ -518,7 +544,7 @@ where
                             }
                         } else {
                             drop(nats_connection);
-                            nc.clone().connection.unwrap().close();
+                            if let Some(connection) = nc.clone().connection { connection.close() };
                             drop(nc);
                             break;
                         }
@@ -542,7 +568,7 @@ where
                                     drop(nats_connection_actual);
                                     drop(result);
                                     drop(nats_connection);
-                                    nc.clone().connection.unwrap().close();
+                                    if let Some(connection) = nc.clone().connection { connection.close() };
                                     drop(nc);
                                     break;
                                 }
@@ -551,7 +577,7 @@ where
                                     drop(error);
                                     drop(result);
                                     drop(nats_connection);
-                                    nc.clone().connection.unwrap().close();
+                                    if let Some(connection) = nc.clone().connection { connection.close() };
                                     drop(nc);
                                     tokio::time::sleep(core::time::Duration::from_millis(500)).await;
                                     continue;
@@ -559,7 +585,7 @@ where
                             }
                         } else {
                             drop(nats_connection);
-                            nc.clone().connection.unwrap().close();
+                            if let Some(connection) = nc.clone().connection { connection.close() };
                             drop(nc);
                             break;
                         }
@@ -583,7 +609,7 @@ where
                                     drop(nats_connection_actual);
                                     drop(result);
                                     drop(nats_connection);
-                                    nc.clone().connection.unwrap().close();
+                                    if let Some(connection) = nc.clone().connection { connection.close() };
                                     drop(nc);
                                     break;
                                 }
@@ -592,7 +618,7 @@ where
                                     drop(error);
                                     drop(result);
                                     drop(nats_connection);
-                                    nc.clone().connection.unwrap().close();
+                                    if let Some(connection) = nc.clone().connection { connection.close() };
                                     drop(nc);
                                     tokio::time::sleep(core::time::Duration::from_millis(500)).await;
                                     continue;
@@ -600,7 +626,7 @@ where
                             }
                         } else {
                             drop(nats_connection);
-                            nc.clone().connection.unwrap().close();
+                            if let Some(connection) = nc.clone().connection { connection.close() };
                             drop(nc);
                             break;
                         }
@@ -624,7 +650,7 @@ where
                                     drop(nats_connection_actual);
                                     drop(result);
                                     drop(nats_connection);
-                                    nc.clone().connection.unwrap().close();
+                                    if let Some(connection) = nc.clone().connection { connection.close() };
                                     drop(nc);
                                     break;
                                 }
@@ -633,7 +659,7 @@ where
                                     drop(error);
                                     drop(result);
                                     drop(nats_connection);
-                                    nc.clone().connection.unwrap().close();
+                                    if let Some(connection) = nc.clone().connection { connection.close() };
                                     drop(nc);
                                     tokio::time::sleep(core::time::Duration::from_millis(500)).await;
                                     continue;
@@ -641,7 +667,7 @@ where
                             }
                         } else {
                             drop(nats_connection);
-                            nc.clone().connection.unwrap().close();
+                            if let Some(connection) = nc.clone().connection { connection.close() };
                             drop(nc);
                             break;
                         }
@@ -906,14 +932,14 @@ where
         match result {
             Ok(nats_connection) => {
                 debug!(target: "borealis_indexer", "Connect: CID: {}, {}; NATS Connection: {:?}", connection_id.clone(), cid.clone(), nats_connection.clone());
-                Ok(Self {
+                return Ok(Self {
                     cid,
                     connection: Some(nats_connection),
-                })
+                });
             }
             Err(error) => {
                 error!(target: "borealis_indexer", "Connect: NATS connection error or wrong credentials: {:?}", error);
-                Err(format!("Connect: NATS connection error or wrong credentials: {:?}", error).into())
+                return Err(format!("Connect: NATS connection error or wrong credentials: {:?}", error).into());
             }
         }
     }
@@ -926,7 +952,7 @@ where
     ) -> Result<Self, Error> {
         if let Ok(()) = self.connection.as_ref().unwrap().flush_timeout(core::time::Duration::from_millis(10000)) {
             debug!(target: "borealis_indexer", "Reconnect: NATS Connection: {:?}", self.clone());
-            Ok(self.clone())
+            return Ok(self.clone());
         } else {
             let connection_id = CID.fetch_add(1, Ordering::SeqCst);
             let cid = CID.load(Ordering::SeqCst);
@@ -939,14 +965,14 @@ where
             match result {
                 Ok(nats_connection) => {
                     debug!(target: "borealis_indexer", "Reconnect: CID: {}, {}; NATS Connection: {:?}", connection_id.clone(), cid.clone(), nats_connection.clone());
-                    Ok(Self {
+                    return Ok(Self {
                         cid,
                         connection: Some(nats_connection),
-                    })
+                    });
                 }
                 Err(error) => {
                     error!(target: "borealis_indexer", "Reconnect: NATS connection error or wrong credentials: {:?}", error);
-                    Err(format!("Reconnect: NATS connection error or wrong credentials: {:?}", error).into())
+                    return Err(format!("Reconnect: NATS connection error or wrong credentials: {:?}", error).into());
                 }
             }
         }
@@ -1070,34 +1096,19 @@ fn main() -> Result<(), Error> {
     let connection_event_sender = connection_event_tx.clone();
     let actual_connection_receiver = actual_connection_tx.subscribe();
 
-    if let SubCommand::Check(run_args) | SubCommand::Run(run_args) = opts.subcmd.clone() {
-        loop {
-            let result = NATSConnection::connect(run_args.to_owned(), connection_event_tx.clone());
-            match &result {
-                Ok(nats_connection) => {
-                    debug!(target: "borealis_indexer", "Main(): Connect with extended options: NATS Connection: {:?}", nats_connection);
-                    actual_connection_tx.send(nats_connection.clone())
-                        .unwrap_or_else(|error|
-                            error!(target: "borealis_indexer", "Main(): Connect with extended options: NATS Connection with CID {} send error: {:?}", nats_connection.cid, error)
-                        );
-                    drop(nats_connection);
-                    drop(result);
-                    break;
-                }
-                Err(error) => {
-                    error!(target: "borealis_indexer", "Main(): Connect with extended options: NATS connection error or wrong credentials: {:?}", error);
-                    drop(error);
-                    drop(result);
-                    std::thread::sleep(core::time::Duration::from_millis(500));
-                    continue;
-                }
-            }
-        }
-    };
+    let connection_event_init = connection_event_tx.clone();
+
+    connection_event_init
+        .blocking_send(ConnectionEvent::InitialConnectionRequest)
+        .unwrap_or_else(|error|
+            error!(target: "borealis_indexer", "Main(): Run: Initial Connection Request: NATS Connection with CID {} event send error: {:?}", NATSConnection::new().cid, error)
+        );
 
     match opts.subcmd {
         SubCommand::Check(run_args) => {
+
             messages_processing_rt.block_on(async move {
+
                 actix::spawn(async move {
                     ConnectionEvent::events_processing(
                         connection_event_tx,
@@ -1147,6 +1158,7 @@ fn main() -> Result<(), Error> {
             let connect_args = run_args.clone();
 
             messages_processing_rt.block_on(async move {
+
                 actix::spawn(async move {
                     ConnectionEvent::events_processing(
                         connection_event_tx,
