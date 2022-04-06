@@ -12,8 +12,8 @@ license = "GPLv3"
 publish = false
 
 [dependencies]
-near-indexer = { git = "ssh://git@github.com/aurora-is-near/borealis.rs.git", rev = "01ba76be736815c57d767e02c499ff4c4be9eacd" }
-borealis-types = { git = "ssh://git@github.com/aurora-is-near/borealis.rs.git", rev = "01ba76be736815c57d767e02c499ff4c4be9eacd" }
+near-indexer = { git = "ssh://git@github.com/aurora-is-near/borealis.rs.git", rev = "c7ec334c20e7f8ea5cfc2f9bfab54ed9bc9d3e0e" }
+borealis-types = { git = "ssh://git@github.com/aurora-is-near/borealis.rs.git", rev = "c7ec334c20e7f8ea5cfc2f9bfab54ed9bc9d3e0e" }
 
 nats = "0.16.0"
 

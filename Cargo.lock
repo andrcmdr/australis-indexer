@@ -586,7 +586,7 @@ dependencies = [
 [[package]]
 name = "borealis-types"
 version = "0.1.0"
-source = "git+ssh://git@github.com/aurora-is-near/borealis.rs.git?rev=01ba76be736815c57d767e02c499ff4c4be9eacd#01ba76be736815c57d767e02c499ff4c4be9eacd"
+source = "git+ssh://git@github.com/aurora-is-near/borealis.rs.git?rev=c7ec334c20e7f8ea5cfc2f9bfab54ed9bc9d3e0e#c7ec334c20e7f8ea5cfc2f9bfab54ed9bc9d3e0e"
 dependencies = [
  "near-primitives",
  "rand 0.8.4",
@@ -2477,7 +2477,7 @@ dependencies = [
 [[package]]
 name = "near-indexer"
 version = "0.0.0"
-source = "git+ssh://git@github.com/aurora-is-near/borealis.rs.git?rev=01ba76be736815c57d767e02c499ff4c4be9eacd#01ba76be736815c57d767e02c499ff4c4be9eacd"
+source = "git+ssh://git@github.com/aurora-is-near/borealis.rs.git?rev=c7ec334c20e7f8ea5cfc2f9bfab54ed9bc9d3e0e#c7ec334c20e7f8ea5cfc2f9bfab54ed9bc9d3e0e"
 dependencies = [
  "actix",
  "anyhow",
