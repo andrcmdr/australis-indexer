@@ -274,11 +274,12 @@ async fn message_producer(
                 let nats_connection = actual_connection_rx.borrow().clone();
                 debug!(target: "borealis_indexer", "Message Producer [CBOR bytes vector]: Current Connection: NATS Connection: {:?}", &nats_connection);
 
-                let result = nats_connection.connection.clone().unwrap().publish(
-                    format!("{}_{}", subject, msg_format.to_string()).as_str(),
-                    BorealisMessage::new(streamer_message.block.header.height, &streamer_message)
-                        .to_cbor(),
-                );
+                let result = nats_connection.connection.as_ref().unwrap()
+                    .publish(
+                        format!("{}_{}", subject, msg_format.to_string()).as_str(),
+                        BorealisMessage::new(streamer_message.block.header.height, &streamer_message)
+                            .to_cbor(),
+                    );
 
                 match &result {
                     Ok(()) => {
@@ -307,11 +308,12 @@ async fn message_producer(
                 let nats_connection = actual_connection_rx.borrow().clone();
                 debug!(target: "borealis_indexer", "Message Producer [JSON bytes vector]: Current Connection: NATS Connection: {:?}", &nats_connection);
 
-                let result = nats_connection.connection.clone().unwrap().publish(
-                    format!("{}_{}", subject, msg_format.to_string()).as_str(),
-                    BorealisMessage::new(streamer_message.block.header.height, &streamer_message)
-                        .to_json_bytes(),
-                );
+                let result = nats_connection.connection.as_ref().unwrap()
+                    .publish(
+                        format!("{}_{}", subject, msg_format.to_string()).as_str(),
+                        BorealisMessage::new(streamer_message.block.header.height, &streamer_message)
+                            .to_json_bytes(),
+                    );
 
                 match &result {
                     Ok(()) => {
@@ -874,11 +876,20 @@ where
 
         match result {
             Ok(nats_connection) => {
-                debug!(target: "borealis_indexer", "Connect: CID: {}, {}; NATS Connection: {:?}", connection_id.clone(), cid.clone(), nats_connection.clone());
-                Ok(Self {
-                    cid,
-                    connection: Some(nats_connection),
-                })
+                match nats_connection.flush_timeout(core::time::Duration::from_millis(10000)) {
+                    Ok(()) => {
+                        debug!(target: "borealis_indexer", "Connect: CID: {}, {}; NATS Connection: {:?}", connection_id, cid, &nats_connection);
+                        Ok(Self {
+                            cid,
+                            connection: Some(nats_connection),
+                        })
+                    }
+                    Err(error) => {
+                        error!(target: "borealis_indexer", "Connect: NATS connection error or connection waiting timeout elapsed: {:?}; CID: {}, {}; NATS Connection: {:?}", error, connection_id, cid, &nats_connection);
+                        nats_connection.close();
+                        Err(format!("Connect: NATS connection error or connection waiting timeout elapsed: {:?}; CID: {}, {};", error, connection_id, cid).into())
+                    }
+                }
             }
             Err(error) => {
                 error!(target: "borealis_indexer", "Connect: NATS connection error or wrong credentials: {:?}", error);
@@ -907,11 +918,20 @@ where
 
             match result {
                 Ok(nats_connection) => {
-                    debug!(target: "borealis_indexer", "Reconnect: CID: {}, {}; NATS Connection: {:?}", connection_id.clone(), cid.clone(), nats_connection.clone());
-                    Ok(Self {
-                        cid,
-                        connection: Some(nats_connection),
-                    })
+                    match nats_connection.flush_timeout(core::time::Duration::from_millis(10000)) {
+                        Ok(()) => {
+                            debug!(target: "borealis_indexer", "Reconnect: CID: {}, {}; NATS Connection: {:?}", connection_id, cid, &nats_connection);
+                            Ok(Self {
+                                cid,
+                                connection: Some(nats_connection),
+                            })
+                        }
+                        Err(error) => {
+                            error!(target: "borealis_indexer", "Reconnect: NATS connection error or connection waiting timeout elapsed: {:?}; CID: {}, {}; NATS Connection: {:?}", error, connection_id, cid, &nats_connection);
+                            nats_connection.close();
+                            Err(format!("Reconnect: NATS connection error or connection waiting timeout elapsed: {:?}; CID: {}, {};", error, connection_id, cid).into())
+                        }
+                    }
                 }
                 Err(error) => {
                     error!(target: "borealis_indexer", "Reconnect: NATS connection error or wrong credentials: {:?}", error);
