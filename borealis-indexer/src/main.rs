@@ -707,8 +707,8 @@ where
                 .with_name("Borealis Indexer [TLS, Server Auth]")
                 .tls_required(true)
                 .add_root_certificate(root_cert_path)
-                .reconnect_buffer_size(1024 * 1024 * 1024)
-                .max_reconnects(100000)
+                .reconnect_buffer_size(256 * 1024 * 1024)
+                .max_reconnects(0)
                 .reconnect_delay_callback(|reconnect_try| {
                     let reconnect_attempt = {
                         if reconnect_try == 0 {
@@ -760,8 +760,8 @@ where
                     .tls_required(true)
                     .add_root_certificate(root_cert_path)
                     .client_cert(client_cert_path, client_private_key)
-                    .reconnect_buffer_size(1024 * 1024 * 1024)
-                    .max_reconnects(100000)
+                    .reconnect_buffer_size(256 * 1024 * 1024)
+                    .max_reconnects(0)
                     .reconnect_delay_callback(|reconnect_try| {
                         let reconnect_attempt = {
                             if reconnect_try == 0 {
@@ -810,8 +810,8 @@ where
             },
             _ => nats::Options::with_credentials(creds_path)
                 .with_name("Borealis Indexer [NATS Connection, without TLS]")
-                .reconnect_buffer_size(1024 * 1024 * 1024)
-                .max_reconnects(100000)
+                .reconnect_buffer_size(256 * 1024 * 1024)
+                .max_reconnects(0)
                 .reconnect_delay_callback(|reconnect_try| {
                     let reconnect_attempt = {
                         if reconnect_try == 0 {
