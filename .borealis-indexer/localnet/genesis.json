@@ -1,6 +1,6 @@
 {
-  "protocol_version": 49,
-  "genesis_time": "2022-01-10T19:45:47.591473007Z",
+  "protocol_version": 53,
+  "genesis_time": "2022-04-11T05:00:19.751661867Z",
   "chain_id": "localnet",
   "genesis_height": 0,
   "num_block_producer_seats": 50,
@@ -37,7 +37,7 @@
   "validators": [
     {
       "account_id": "test.near",
-      "public_key": "ed25519:8ByMHEhSbkPn113k1uDe4qUSJJtKHLQUXA7UM93MxwzA",
+      "public_key": "ed25519:DU2mQqDTUpFryqU92id6KitKr1zr24LbMCg7U2bX25Pr",
       "amount": "50000000000000000000000000000000"
     }
   ],
@@ -82,7 +82,7 @@
     {
       "AccessKey": {
         "account_id": "test.near",
-        "public_key": "ed25519:8ByMHEhSbkPn113k1uDe4qUSJJtKHLQUXA7UM93MxwzA",
+        "public_key": "ed25519:DU2mQqDTUpFryqU92id6KitKr1zr24LbMCg7U2bX25Pr",
         "access_key": {
           "nonce": 0,
           "permission": "FullAccess"
