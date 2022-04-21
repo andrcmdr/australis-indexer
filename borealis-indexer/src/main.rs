@@ -660,7 +660,6 @@ where
 
 static CID: AtomicUsize = AtomicUsize::new(0);
 
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 struct NATSConnection
 where

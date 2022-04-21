@@ -554,7 +554,7 @@ name = "borealis-consumer"
 version = "0.9.0"
 dependencies = [
  "actix",
- "borealis-types 0.9.0",
+ "borealis-types",
  "clap",
  "nats",
  "openssl-probe",
@@ -572,7 +572,7 @@ name = "borealis-indexer"
 version = "0.9.0"
 dependencies = [
  "actix",
- "borealis-types 0.9.0 (git+ssh://git@github.com/aurora-is-near/borealis.rs.git?tag=v0.9.2)",
+ "borealis-types",
  "clap",
  "nats",
  "near-indexer",
@@ -589,18 +589,7 @@ dependencies = [
 [[package]]
 name = "borealis-types"
 version = "0.9.0"
-dependencies = [
- "near-primitives",
- "rand 0.8.4",
- "serde",
- "serde_cbor",
- "serde_json",
-]
-
-[[package]]
-name = "borealis-types"
-version = "0.9.0"
-source = "git+ssh://git@github.com/aurora-is-near/borealis.rs.git?tag=v0.9.2#d944085b36e67fe3a0263d659465b6937018173b"
+source = "git+ssh://git@github.com/aurora-is-near/borealis.rs.git?tag=v0.9.3#1bb950634214d0604bd5ce78a9c741d3f30add59"
 dependencies = [
  "near-primitives",
  "rand 0.8.4",
@@ -2485,12 +2474,12 @@ dependencies = [
 [[package]]
 name = "near-indexer"
 version = "0.9.0"
-source = "git+ssh://git@github.com/aurora-is-near/borealis.rs.git?tag=v0.9.2#d944085b36e67fe3a0263d659465b6937018173b"
+source = "git+ssh://git@github.com/aurora-is-near/borealis.rs.git?tag=v0.9.3#1bb950634214d0604bd5ce78a9c741d3f30add59"
 dependencies = [
  "actix",
  "anyhow",
  "async-recursion",
- "borealis-types 0.9.0 (git+ssh://git@github.com/aurora-is-near/borealis.rs.git?tag=v0.9.2)",
+ "borealis-types",
  "futures",
  "near-chain-configs",
  "near-client",
