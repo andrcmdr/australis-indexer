@@ -1173,7 +1173,7 @@ fn main() -> Result<(), Error> {
 
                 // actix::System::current().stop();
             });
-            messages_processing_rt.run().unwrap();
+            messages_processing_rt.run().unwrap(); // make restart of system in case of stop or error returned, due to run-time panic in a thread
         }
     };
     // Graceful shutdown for all tasks (futures, green threads) currently executed on existed run-time thread-pools

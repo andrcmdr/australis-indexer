@@ -11,7 +11,7 @@ pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 /// CLI options (subcommands and flags)
 #[derive(Clap, Debug)]
-#[clap(version = "0.1.0", author = "Aurora <hello@aurora.dev>")]
+#[clap(version = "0.9.0", author = "Aurora <hello@aurora.dev>")]
 #[clap(setting = AppSettings::SubcommandRequiredElseHelp)]
 pub(crate) struct Opts {
     /// Verbosity level for extensive output to stdout or log
