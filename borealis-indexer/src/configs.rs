@@ -11,7 +11,7 @@ pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 /// CLI options (subcommands and flags)
 #[derive(Parser, Debug, Clone)]
-#[clap(version = "0.9.0", author = "Aurora <hello@aurora.dev>")]
+#[clap(version = "0.10.0", author = "Aurora <hello@aurora.dev>")]
 #[clap(subcommand_required = true)]
 #[clap(arg_required_else_help = true)]
 pub(crate) struct Opts {

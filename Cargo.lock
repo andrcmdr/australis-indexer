@@ -552,7 +552,7 @@ dependencies = [
 
 [[package]]
 name = "borealis-consumer"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "actix",
  "borealis-types",
@@ -570,7 +570,7 @@ dependencies = [
 
 [[package]]
 name = "borealis-indexer"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "actix",
  "borealis-types",

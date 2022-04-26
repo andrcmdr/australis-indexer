@@ -10,7 +10,7 @@ use nats;
 use near_indexer;
 use serde_cbor as cbor;
 use serde_json;
-// use tokio::runtime;
+use tokio::runtime::{Runtime, Builder};
 use tokio::sync::{mpsc, watch};
 use tracing:: {info, error, debug};
 
@@ -711,7 +711,7 @@ where
                 .reconnect_delay_callback(|reconnect_try| {
                     let reconnect_attempt = {
                         if reconnect_try == 0 {
-                            1 as usize
+                            1_usize
                         } else {
                             reconnect_try
                         }
@@ -764,7 +764,7 @@ where
                     .reconnect_delay_callback(|reconnect_try| {
                         let reconnect_attempt = {
                             if reconnect_try == 0 {
-                                1 as usize
+                                1_usize
                             } else {
                                 reconnect_try
                             }
@@ -814,7 +814,7 @@ where
                 .reconnect_delay_callback(|reconnect_try| {
                     let reconnect_attempt = {
                         if reconnect_try == 0 {
-                            1 as usize
+                            1_usize
                         } else {
                             reconnect_try
                         }
@@ -961,26 +961,10 @@ where
     }
 }
 
-fn main() -> Result<(), Error> {
-    // Search for the root certificates to perform HTTPS/TLS calls
-    // for downloading genesis and config files
-    openssl_probe::init_ssl_cert_env_vars();
-
-    // Initialize logging
-    init_logging();
-
-    // Parse CLI options
-    let opts: Opts = Opts::parse();
-
-    // let home_dir = opts.home_dir.unwrap_or(std::path::PathBuf::from(near_indexer::get_default_home()));
-    let home_dir = opts
-        .home_dir
-        .unwrap_or(std::path::PathBuf::from("./.borealis-indexer"));
-
-    /*
-    let (events_processing_rt, messages_processing_rt) = {
-        if let Some(VerbosityLevel::WithRuntimeThreadsDump) = opts.verbose.clone() {
-            let events_processing_rt = runtime::Builder::new_multi_thread()
+fn events_processing_rt(verbosity_level: Option<VerbosityLevel>) -> Result<Runtime, Error> {
+    let events_processing_rt = {
+        if let Some(VerbosityLevel::WithRuntimeThreadsDump) = verbosity_level {
+            let events_processing_rt = Builder::new_multi_thread()
                 .enable_all()
                 .thread_name_fn( || {
                     static THREAD_ID: AtomicUsize = AtomicUsize::new(0);
@@ -988,43 +972,22 @@ fn main() -> Result<(), Error> {
                     format!("connection-events-processing-{}", thread_id)
                 })
                 .on_thread_start( || {
-                    info!(target: "borealis_indexer", "NATS connection events processing runtime: thread starting");
+                    debug!(target: "borealis_indexer", "NATS connection events processing runtime: thread starting");
                 })
                 .on_thread_stop( || {
-                    info!(target: "borealis_indexer", "NATS connection events processing runtime: thread stopping");
+                    debug!(target: "borealis_indexer", "NATS connection events processing runtime: thread stopping");
                 })
                 .on_thread_park( || {
-                    info!(target: "borealis_indexer", "NATS connection events processing runtime: thread parking and going idle");
+                    debug!(target: "borealis_indexer", "NATS connection events processing runtime: thread parking and going idle");
                 })
                 .on_thread_unpark( || {
-                    info!(target: "borealis_indexer", "NATS connection events processing runtime: thread unparked and starts executing tasks");
+                    debug!(target: "borealis_indexer", "NATS connection events processing runtime: thread unparked and starts executing tasks");
                 })
                 .build()?;
 
-            let messages_processing_rt = runtime::Builder::new_multi_thread()
-                .enable_all()
-                .thread_name_fn( || {
-                    static THREAD_ID: AtomicUsize = AtomicUsize::new(0);
-                    let thread_id = THREAD_ID.fetch_add(1, Ordering::SeqCst);
-                    format!("streamer-messages-processing-{}", thread_id)
-                })
-                .on_thread_start( || {
-                    info!(target: "borealis_indexer", "Streamer Messages processing runtime: thread starting");
-                })
-                .on_thread_stop( || {
-                    info!(target: "borealis_indexer", "Streamer Messages processing runtime: thread stopping");
-                })
-                .on_thread_park( || {
-                    info!(target: "borealis_indexer", "Streamer Messages processing runtime: thread parking and going idle");
-                })
-                .on_thread_unpark( || {
-                    info!(target: "borealis_indexer", "Streamer Messages processing runtime: thread unparked and starts executing tasks");
-                })
-                .build()?;
-
-            (events_processing_rt, messages_processing_rt)
+            events_processing_rt
         } else {
-            let events_processing_rt = runtime::Builder::new_multi_thread()
+            let events_processing_rt = Builder::new_multi_thread()
                 .enable_all()
                 .thread_name_fn(|| {
                     static THREAD_ID: AtomicUsize = AtomicUsize::new(0);
@@ -1033,150 +996,215 @@ fn main() -> Result<(), Error> {
                 })
                 .build()?;
 
-            let messages_processing_rt = runtime::Builder::new_multi_thread()
-                .enable_all()
-                .thread_name_fn(|| {
-                    static THREAD_ID: AtomicUsize = AtomicUsize::new(0);
-                    let thread_id = THREAD_ID.fetch_add(1, Ordering::SeqCst);
-                    format!("streamer-messages-processing-{}", thread_id)
-                })
-                .build()?;
-
-            (events_processing_rt, messages_processing_rt)
+            events_processing_rt
         }
     };
-    */
+    Ok(events_processing_rt)
+}
 
-    // let events_processing_rt = actix::System::new();
-    let messages_processing_rt = actix::System::new();
+fn messages_processing_rt(verbosity_level: Option<VerbosityLevel>) -> Result<Runtime, Error> {
+    let messages_processing_rt = {
+        if let Some(VerbosityLevel::WithRuntimeThreadsDump) = verbosity_level {
+            let messages_processing_rt = Builder::new_multi_thread()
+                .enable_all()
+                .thread_name_fn( || {
+                    static THREAD_ID: AtomicUsize = AtomicUsize::new(0);
+                    let thread_id = THREAD_ID.fetch_add(1, Ordering::SeqCst);
+                    format!("streamer-messages-processing-{}", thread_id)
+                })
+                .on_thread_start( || {
+                    debug!(target: "borealis_indexer", "Streamer Messages processing runtime: thread starting");
+                })
+                .on_thread_stop( || {
+                    debug!(target: "borealis_indexer", "Streamer Messages processing runtime: thread stopping");
+                })
+                .on_thread_park( || {
+                    debug!(target: "borealis_indexer", "Streamer Messages processing runtime: thread parking and going idle");
+                })
+                .on_thread_unpark( || {
+                    debug!(target: "borealis_indexer", "Streamer Messages processing runtime: thread unparked and starts executing tasks");
+                })
+                .build()?;
 
-    let (connection_event_tx, connection_event_rx) = 
-        mpsc::channel::<ConnectionEvent>(1000);
-    let (actual_connection_tx, actual_connection_rx) =
-        watch::channel::<NATSConnection>(NATSConnection::new());
+            messages_processing_rt
+        } else {
+            let messages_processing_rt = Builder::new_multi_thread()
+                .enable_all()
+                .thread_name_fn(|| {
+                    static THREAD_ID: AtomicUsize = AtomicUsize::new(0);
+                    let thread_id = THREAD_ID.fetch_add(1, Ordering::SeqCst);
+                    format!("streamer-messages-processing-{}", thread_id)
+                })
+                .build()?;
 
-    let connection_event_sender = connection_event_tx.clone();
-    let actual_connection_receiver = actual_connection_tx.subscribe();
+            messages_processing_rt
+        }
+    };
+    Ok(messages_processing_rt)
+}
 
-    if let SubCommand::Check(run_args) | SubCommand::Run(run_args) = opts.subcmd.clone() {
-        loop {
-            let result = NATSConnection::connect(run_args.to_owned(), connection_event_tx.clone());
-            match &result {
-                Ok(nats_connection) => {
-                    debug!(target: "borealis_indexer", "Main(): Connect with extended options: NATS Connection: {:?}", nats_connection);
-                    actual_connection_tx.send(nats_connection.clone())
-                        .unwrap_or_else(|error|
-                            error!(target: "borealis_indexer", "Main(): Connect with extended options: NATS Connection with CID {} send error: {:?}", nats_connection.cid, error)
-                        );
-                    drop(nats_connection);
-                    drop(result);
-                    break;
-                }
-                Err(error) => {
-                    error!(target: "borealis_indexer", "Main(): Connect with extended options: NATS connection error or wrong credentials: {:?}", error);
-                    drop(error);
-                    drop(result);
-                    std::thread::sleep(core::time::Duration::from_millis(500));
-                    continue;
+fn main() -> Result<(), Error> {
+    // restart of system in case of stop or error returned, due to run-time panic in a thread
+    loop {
+        // Search for the root certificates to perform HTTPS/TLS calls
+        // for downloading genesis and config files
+        openssl_probe::init_ssl_cert_env_vars();
+
+        // Initialize logging
+        init_logging();
+
+        // Parse CLI options
+        let opts: Opts = Opts::parse();
+
+        // let home_dir = opts.home_dir.unwrap_or(std::path::PathBuf::from(near_indexer::get_default_home()));
+        let home_dir = opts
+            .home_dir
+            .unwrap_or(std::path::PathBuf::from("./.borealis-indexer"));
+
+        let (connection_event_tx, connection_event_rx) = 
+            mpsc::channel::<ConnectionEvent>(1000);
+        let (actual_connection_tx, actual_connection_rx) =
+            watch::channel::<NATSConnection>(NATSConnection::new());
+
+        let connection_event_sender = connection_event_tx.clone();
+        let actual_connection_receiver = actual_connection_tx.subscribe();
+
+        if let SubCommand::Check(run_args) | SubCommand::Run(run_args) = opts.subcmd.clone() {
+            loop {
+                let result = NATSConnection::connect(run_args.to_owned(), connection_event_tx.clone());
+                match &result {
+                    Ok(nats_connection) => {
+                        debug!(target: "borealis_indexer", "Main(): Connect with extended options: NATS Connection: {:?}", nats_connection);
+                        actual_connection_tx.send(nats_connection.clone())
+                            .unwrap_or_else(|error|
+                                error!(target: "borealis_indexer", "Main(): Connect with extended options: NATS Connection with CID {} send error: {:?}", nats_connection.cid, error)
+                            );
+                        drop(nats_connection);
+                        drop(result);
+                        break;
+                    }
+                    Err(error) => {
+                        error!(target: "borealis_indexer", "Main(): Connect with extended options: NATS connection error or wrong credentials: {:?}", error);
+                        drop(error);
+                        drop(result);
+                        std::thread::sleep(core::time::Duration::from_millis(500));
+                        continue;
+                    }
                 }
             }
-        }
-    };
+        };
 
-    match opts.subcmd {
-        SubCommand::Check(run_args) => {
-
-            messages_processing_rt.block_on(async move {
-
-                actix::spawn(async move {
-                    ConnectionEvent::events_processing(
-                        connection_event_tx,
-                        connection_event_rx,
-                        actual_connection_tx,
-                        actual_connection_rx,
-                        run_args,
-                    )
-                    .await;
-                });
-
-                ConnectionEvent::events_processing_check(
-                    actual_connection_receiver.clone(),
-                    connection_event_sender.clone(),
+        match opts.subcmd {
+            SubCommand::Check(run_args) => {
+                let events_processing_rt = actix::System::with_tokio_rt(||
+                    events_processing_rt(opts.verbose.clone())
+                    .expect("Main(): Check(): Run-time error returned while creating Indexer's custom Tokio run-time for Actix")
                 );
 
-                // actix::System::current().stop();
-            });
-            messages_processing_rt.run().unwrap();
-        }
-        SubCommand::Init(config_args) => {
-            near_indexer::indexer_init_configs(&home_dir, config_args.into())
-                .expect("Error while creating Indexer's initial configuration files");
-        }
-        SubCommand::Run(run_args) => {
-            let indexer_config = near_indexer::IndexerConfig {
-                home_dir,
-                // recover and continue message streaming from latest synced block (real-time), or from interruption, or from exact block height
-                sync_mode: match run_args.sync_mode {
-                    SyncMode::LatestSynced => near_indexer::SyncModeEnum::LatestSynced,
-                    SyncMode::FromInterruption => near_indexer::SyncModeEnum::FromInterruption,
-                    SyncMode::BlockHeight => {
-                        near_indexer::SyncModeEnum::BlockHeight(run_args.block_height.unwrap_or(0))
-                    }
-                },
-                // waiting for full sync or stream messages while syncing
-                await_for_node_synced: match run_args.await_synced {
-                    AwaitSynced::WaitForFullSync => {
-                        near_indexer::AwaitForNodeSyncedEnum::WaitForFullSync
-                    }
-                    AwaitSynced::StreamWhileSyncing => {
-                        near_indexer::AwaitForNodeSyncedEnum::StreamWhileSyncing
-                    }
-                },
-            };
+                events_processing_rt.block_on(async move {
 
-            let connect_args = run_args.clone();
+                    actix::spawn(async move {
+                        ConnectionEvent::events_processing(
+                            connection_event_tx,
+                            connection_event_rx,
+                            actual_connection_tx,
+                            actual_connection_rx,
+                            run_args,
+                        )
+                        .await;
+                    });
 
-            messages_processing_rt.block_on(async move {
-
-                actix::spawn(async move {
-                    ConnectionEvent::events_processing(
-                        connection_event_tx,
-                        connection_event_rx,
-                        actual_connection_tx,
-                        actual_connection_rx,
-                        connect_args,
-                    )
-                    .await;
-                });
-
-                ConnectionEvent::events_processing_check(
-                    actual_connection_receiver.clone(),
-                    connection_event_sender.clone(),
-                );
-
-                let indexer = near_indexer::Indexer::new(indexer_config)
-                    .expect("Error while creating Indexer instance");
-
-                let events_stream = indexer.streamer();
-
-                actix::spawn(async move {
-                    message_producer(
-                        events_stream,
+                    ConnectionEvent::events_processing_check(
                         actual_connection_receiver.clone(),
                         connection_event_sender.clone(),
-                        run_args.subject,
-                        run_args.msg_format,
-                        opts.verbose,
-                    )
-                    .await;
-                });
+                    );
 
-                // actix::System::current().stop();
-            });
-            messages_processing_rt.run().unwrap(); // make restart of system in case of stop or error returned, due to run-time panic in a thread
-        }
-    };
-    // Graceful shutdown for all tasks (futures, green threads) currently executed on existed run-time thread-pools
+                    // actix::System::current().stop();
+                });
+                events_processing_rt.run()
+                    .unwrap_or_else(|error|
+                        error!(target: "borealis_indexer", "Main(): Check(): Indexer's connection checking events processing loop returned run-time error: {:?}", error)
+                    );
+            }
+            SubCommand::Init(config_args) => {
+                near_indexer::indexer_init_configs(&home_dir, config_args.into())
+                    .expect("Main(): Init(): Error while creating Indexer's initial configuration files");
+                break;
+            }
+            SubCommand::Run(run_args) => {
+                let indexer_config = near_indexer::IndexerConfig {
+                    home_dir,
+                    // recover and continue message streaming from latest synced block (real-time), or from interruption, or from exact block height
+                    sync_mode: match run_args.sync_mode {
+                        SyncMode::LatestSynced => near_indexer::SyncModeEnum::LatestSynced,
+                        SyncMode::FromInterruption => near_indexer::SyncModeEnum::FromInterruption,
+                        SyncMode::BlockHeight => {
+                            near_indexer::SyncModeEnum::BlockHeight(run_args.block_height.unwrap_or(0))
+                        }
+                    },
+                    // waiting for full sync or stream messages while syncing
+                    await_for_node_synced: match run_args.await_synced {
+                        AwaitSynced::WaitForFullSync => {
+                            near_indexer::AwaitForNodeSyncedEnum::WaitForFullSync
+                        }
+                        AwaitSynced::StreamWhileSyncing => {
+                            near_indexer::AwaitForNodeSyncedEnum::StreamWhileSyncing
+                        }
+                    },
+                };
+
+                let connect_args = run_args.clone();
+
+                let messages_processing_rt = actix::System::with_tokio_rt(||
+                    messages_processing_rt(opts.verbose.clone())
+                    .expect("Main(): Run(): Run-time error returned while creating Indexer's custom Tokio run-time for Actix")
+                );
+
+                messages_processing_rt.block_on(async move {
+
+                    actix::spawn(async move {
+                        ConnectionEvent::events_processing(
+                            connection_event_tx,
+                            connection_event_rx,
+                            actual_connection_tx,
+                            actual_connection_rx,
+                            connect_args,
+                        )
+                        .await;
+                    });
+
+                    ConnectionEvent::events_processing_check(
+                        actual_connection_receiver.clone(),
+                        connection_event_sender.clone(),
+                    );
+
+                    let indexer = near_indexer::Indexer::new(indexer_config)
+                        .expect("Main(): Run(): Error while creating Indexer's instance");
+
+                    let events_stream = indexer.streamer();
+
+                    actix::spawn(async move {
+                        message_producer(
+                            events_stream,
+                            actual_connection_receiver.clone(),
+                            connection_event_sender.clone(),
+                            run_args.subject,
+                            run_args.msg_format,
+                            opts.verbose,
+                        )
+                        .await;
+                    });
+
+                    // actix::System::current().stop();
+                });
+                messages_processing_rt.run()
+                    .unwrap_or_else(|error|
+                        error!(target: "borealis_indexer", "Main(): Run(): Indexer's messages processing loop returned run-time error: {:?}", error)
+                    );
+            }
+        };
+    } // restart of system in case of stop or error returned, due to run-time panic in a thread
+// Graceful shutdown for all tasks (futures, green threads) currently executed on existed run-time thread-pools
 //    info!(target: "borealis_indexer", "Shutdown process within 10 seconds...");
 //    messages_processing_rt.shutdown_timeout(core::time::Duration::from_secs(10));
 //    events_processing_rt.shutdown_timeout(core::time::Duration::from_secs(10));
