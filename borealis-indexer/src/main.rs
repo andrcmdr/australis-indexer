@@ -11,10 +11,96 @@ use near_indexer;
 use serde_cbor as cbor;
 use serde_json;
 use tokio::runtime::{Runtime, Builder};
+use tokio::signal::{ctrl_c, unix::{signal, SignalKind}};
 use tokio::sync::{mpsc, watch};
 use tracing:: {info, error, debug};
 
 pub mod configs;
+
+static SIGNAL: AtomicUsize = AtomicUsize::new(0);
+
+async fn kill_switch_usr1() -> Result<(), Error> {
+    let mut kill_signal_stream = signal(SignalKind::from_raw(10))?;
+    info!(
+        target: "borealis_indexer",
+        "Kill signal (USR1) handler installed\n"
+    );
+    while let Some(()) = kill_signal_stream.recv().await {
+        info!(
+            target: "borealis_indexer",
+            "Kill signal (USR1) handler triggered\n"
+        );
+        SIGNAL.store(10, Ordering::SeqCst);
+        actix::System::current().stop();
+    }
+    Ok(())
+}
+
+async fn kill_switch_usr2() -> Result<(), Error> {
+    let mut kill_signal_stream = signal(SignalKind::from_raw(12))?;
+    info!(
+        target: "borealis_indexer",
+        "Kill signal (USR2) handler installed\n"
+    );
+    while let Some(()) = kill_signal_stream.recv().await {
+        info!(
+            target: "borealis_indexer",
+            "Kill signal (USR2) handler triggered\n"
+        );
+        SIGNAL.store(12, Ordering::SeqCst);
+        actix::System::current().stop();
+    }
+    Ok(())
+}
+
+async fn term_switch() -> Result<(), Error> {
+    let mut term_signal_stream = signal(SignalKind::terminate())?;
+    info!(
+        target: "borealis_indexer",
+        "Terminate signal handler installed\n"
+    );
+    while let Some(()) = term_signal_stream.recv().await {
+        info!(
+            target: "borealis_indexer",
+            "Terminate signal handler triggered\n"
+        );
+        SIGNAL.store(15, Ordering::SeqCst);
+        actix::System::current().stop();
+    }
+    Ok(())
+}
+
+async fn hup_switch() -> Result<(), Error> {
+    let mut hup_signal_stream = signal(SignalKind::hangup())?;
+    info!(
+        target: "borealis_indexer",
+        "Hangup signal handler installed\n"
+    );
+    while let Some(()) = hup_signal_stream.recv().await {
+        info!(
+            target: "borealis_indexer",
+            "Hangup signal handler triggered\n"
+        );
+        SIGNAL.store(1, Ordering::SeqCst);
+    }
+    Ok(())
+}
+
+async fn key_switch() -> Result<(), Error> {
+    info!(
+        target: "borealis_indexer",
+        "Ctrl-C key sequence handler installed\n"
+    );
+    while let Ok(()) = ctrl_c().await {
+        info!(
+            target: "borealis_indexer",
+            "Ctrl-C key sequence handler triggered\n"
+        );
+        SIGNAL.store(602437500, Ordering::SeqCst);
+        actix::System::current().stop();
+    }
+    Ok(())
+}
 
 async fn message_producer(
     mut events_stream: mpsc::Receiver<near_indexer::StreamerMessage>,
@@ -961,13 +1047,14 @@ where
     }
 }
 
+static THREAD_ID: AtomicUsize = AtomicUsize::new(0);
+
 fn events_processing_rt(verbosity_level: Option<VerbosityLevel>) -> Result<Runtime, Error> {
     let events_processing_rt = {
         if let Some(VerbosityLevel::WithRuntimeThreadsDump) = verbosity_level {
             let events_processing_rt = Builder::new_multi_thread()
                 .enable_all()
                 .thread_name_fn( || {
-                    static THREAD_ID: AtomicUsize = AtomicUsize::new(0);
                     let thread_id = THREAD_ID.fetch_add(1, Ordering::SeqCst);
                     format!("connection-events-processing-{}", thread_id)
                 })
@@ -990,7 +1077,6 @@ fn events_processing_rt(verbosity_level: Option<VerbosityLevel>) -> Result<Runti
             let events_processing_rt = Builder::new_multi_thread()
                 .enable_all()
                 .thread_name_fn(|| {
-                    static THREAD_ID: AtomicUsize = AtomicUsize::new(0);
                     let thread_id = THREAD_ID.fetch_add(1, Ordering::SeqCst);
                     format!("connection-events-processing-{}", thread_id)
                 })
@@ -1008,7 +1094,6 @@ fn messages_processing_rt(verbosity_level: Option<VerbosityLevel>) -> Result<Run
             let messages_processing_rt = Builder::new_multi_thread()
                 .enable_all()
                 .thread_name_fn( || {
-                    static THREAD_ID: AtomicUsize = AtomicUsize::new(0);
                     let thread_id = THREAD_ID.fetch_add(1, Ordering::SeqCst);
                     format!("streamer-messages-processing-{}", thread_id)
                 })
@@ -1031,7 +1116,6 @@ fn messages_processing_rt(verbosity_level: Option<VerbosityLevel>) -> Result<Run
             let messages_processing_rt = Builder::new_multi_thread()
                 .enable_all()
                 .thread_name_fn(|| {
-                    static THREAD_ID: AtomicUsize = AtomicUsize::new(0);
                     let thread_id = THREAD_ID.fetch_add(1, Ordering::SeqCst);
                     format!("streamer-messages-processing-{}", thread_id)
                 })
@@ -1102,6 +1186,22 @@ fn main() -> Result<(), Error> {
                 );
 
                 events_processing_rt.block_on(async move {
+                    // Unix signals and key sequence handlers
+                    actix::spawn(async move {
+                        key_switch().await.unwrap();
+                    });
+                    actix::spawn(async move {
+                        hup_switch().await.unwrap();
+                    });
+                    actix::spawn(async move {
+                        term_switch().await.unwrap();
+                    });
+                    actix::spawn(async move {
+                        kill_switch_usr1().await.unwrap();
+                    });
+                    actix::spawn(async move {
+                        kill_switch_usr2().await.unwrap();
+                    });
 
                     actix::spawn(async move {
                         ConnectionEvent::events_processing(
@@ -1119,7 +1219,6 @@ fn main() -> Result<(), Error> {
                         connection_event_sender.clone(),
                     );
 
-                    // actix::System::current().stop();
                 });
                 events_processing_rt.run()
                     .unwrap_or_else(|error|
@@ -1161,6 +1260,22 @@ fn main() -> Result<(), Error> {
                 );
 
                 messages_processing_rt.block_on(async move {
+                    // Unix signals and key sequence handlers
+                    actix::spawn(async move {
+                        key_switch().await.unwrap();
+                    });
+                    actix::spawn(async move {
+                        hup_switch().await.unwrap();
+                    });
+                    actix::spawn(async move {
+                        term_switch().await.unwrap();
+                    });
+                    actix::spawn(async move {
+                        kill_switch_usr1().await.unwrap();
+                    });
+                    actix::spawn(async move {
+                        kill_switch_usr2().await.unwrap();
+                    });
 
                     actix::spawn(async move {
                         ConnectionEvent::events_processing(
@@ -1195,7 +1310,6 @@ fn main() -> Result<(), Error> {
                         .await;
                     });
 
-                    // actix::System::current().stop();
                 });
                 messages_processing_rt.run()
                     .unwrap_or_else(|error|
@@ -1203,10 +1317,14 @@ fn main() -> Result<(), Error> {
                     );
             }
         };
+        if let 602437500 | 15 | 12 | 10 = SIGNAL.load(Ordering::SeqCst) {
+            break;
+        }
     } // restart of system in case of stop or error returned, due to run-time panic in a thread
-// Graceful shutdown for all tasks (futures, green threads) currently executed on existed run-time thread-pools
-//    info!(target: "borealis_indexer", "Shutdown process within 10 seconds...");
-//    messages_processing_rt.shutdown_timeout(core::time::Duration::from_secs(10));
-//    events_processing_rt.shutdown_timeout(core::time::Duration::from_secs(10));
+//  Graceful shutdown for all tasks (futures, green threads) currently executed on existed run-time thread-pools
+    info!(target: "borealis_indexer", "Shutdown process within 10 seconds...");
+//  messages_processing_rt.shutdown_timeout(core::time::Duration::from_secs(10));
+//  events_processing_rt.shutdown_timeout(core::time::Duration::from_secs(10));
+    std::thread::sleep(core::time::Duration::from_millis(10000));
     Ok(())
 }
