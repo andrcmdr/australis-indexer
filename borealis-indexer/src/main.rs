@@ -1,6 +1,6 @@
 use actix;
 use borealis_types::types::BorealisMessage;
-use clap::Clap;
+use clap::Parser;
 use configs::{
     init_logging, AwaitSynced, Error, MsgFormat, Opts, RunArgs, SubCommand, SyncMode,
     VerbosityLevel,

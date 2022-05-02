@@ -1,4 +1,4 @@
-use clap::{AppSettings, Clap};
+use clap::Parser;
 
 use near_indexer::near_primitives::types::Gas;
 
@@ -10,9 +10,10 @@ use std::string::ToString;
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 /// CLI options (subcommands and flags)
-#[derive(Clap, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[clap(version = "0.9.0", author = "Aurora <hello@aurora.dev>")]
-#[clap(setting = AppSettings::SubcommandRequiredElseHelp)]
+#[clap(subcommand_required = true)]
+#[clap(arg_required_else_help = true)]
 pub(crate) struct Opts {
     /// Verbosity level for extensive output to stdout or log
     #[clap(short, long)]
@@ -29,7 +30,7 @@ pub(crate) struct Opts {
 }
 
 /// CLI subcommands
-#[derive(Clap, Debug, Clone)]
+#[derive(Parser, Debug, Clone)]
 pub(crate) enum SubCommand {
     /// Checking connection to NATS
     Check(RunArgs),
@@ -40,7 +41,7 @@ pub(crate) enum SubCommand {
 }
 
 /// CLI options to run Borealis Indexer
-#[derive(Clap, Debug, Clone)]
+#[derive(Parser, Debug, Clone)]
 pub(crate) struct RunArgs {
     /// root CA certificate
     #[clap(long)]
@@ -76,7 +77,7 @@ pub(crate) struct RunArgs {
 }
 
 /// Streaming messages format (should be upper case, 'cause it's a suffix for `subject` name, and NATS subject is case sensitive)
-#[derive(Clap, Debug, Clone, Copy)]
+#[derive(Parser, Debug, Clone, Copy)]
 pub(crate) enum MsgFormat {
     Cbor,
     Json,
@@ -108,7 +109,7 @@ impl ToString for MsgFormat {
 }
 
 /// Definition of a syncing mode for NEAR Indexer
-#[derive(Clap, Debug, Clone, Copy)]
+#[derive(Parser, Debug, Clone, Copy)]
 pub(crate) enum SyncMode {
     /// Real-time syncing, always taking the latest finalized block to stream
     LatestSynced,
@@ -132,7 +133,7 @@ impl FromStr for SyncMode {
 }
 
 /// Define whether await for node to be fully synced or stream while syncing (useful for indexing from genesis)
-#[derive(Clap, Debug, Clone, Copy)]
+#[derive(Parser, Debug, Clone, Copy)]
 pub(crate) enum AwaitSynced {
     /// Don't stream until the node is fully synced
     WaitForFullSync,
@@ -156,7 +157,7 @@ impl FromStr for AwaitSynced {
 /// WithBlockHashHeight - output only block height & hash
 /// WithStreamerMessageDump - full dump of `StreamerMessage`
 /// WithStreamerMessageParse - full dump with full parse of `StreamerMessage`
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Parser, Debug, Clone, Copy, Eq, PartialEq)]
 pub enum VerbosityLevel {
     WithRuntimeThreadsDump,
     WithStreamerMessageDump,
@@ -177,7 +178,7 @@ impl FromStr for VerbosityLevel {
 }
 
 /// Override standard config args with CLI options
-#[derive(Clap, Debug, Clone)]
+#[derive(Parser, Debug, Clone)]
 pub(crate) struct InitConfigArgs {
     /// chain/network id (localnet, devnet, testnet, betanet, mainnet)
     #[clap(short, long)]

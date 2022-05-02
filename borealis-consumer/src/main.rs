@@ -1,5 +1,5 @@
 use actix;
-use clap::Clap;
+use clap::Parser;
 use configs::{init_logging, MsgFormat, Opts, RunArgs, SubCommand, VerbosityLevel, WorkMode};
 use nats;
 use nats::jetstream::{
