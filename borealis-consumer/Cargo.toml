@@ -12,7 +12,7 @@ publish = false
 
 [dependencies]
 # borealis-types = { path = "../../borealis.rs/borealis-types" }
-borealis-types = { git = "ssh://git@github.com/aurora-is-near/borealis.rs.git", branch = "main" }
+borealis-types = { git = "ssh://git@github.com/aurora-is-near/borealis.rs.git", branch = "stable" }
 # borealis-types = { git = "ssh://git@github.com/aurora-is-near/borealis.rs.git", tag = "v0.9.0" }
 
 nats = "0.16.0"

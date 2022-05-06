@@ -16,7 +16,7 @@ pub mod configs;
 
 fn message_consumer(
     msg: nats::Message,
-    msg_format: MsgFormat,
+    context: RunArgs,
     verbosity_level: Option<VerbosityLevel>,
 ) {
     /*
@@ -257,15 +257,30 @@ fn message_consumer(
         "Message consumer loop executed: message received\n"
     );
 
-    // Decoding of Borealis Message receved from NATS subject
-    let borealis_message: BorealisMessage<StreamerMessage> = match msg_format {
-        MsgFormat::Cbor => BorealisMessage::from_cbor(msg.data.as_ref())
-            .expect("[From CBOR bytes vector: message empty] Message decoding error"),
-        MsgFormat::Json => BorealisMessage::from_json_bytes(msg.data.as_ref())
-            .expect("[From JSON bytes vector: message empty] Message decoding error"),
+    let streamer_message = if context.payload_compressed {
+        // Decoding of Borealis Message receved from NATS subject
+        let borealis_message: BorealisMessage<Vec<u8>> = match context.msg_format {
+            MsgFormat::Cbor => BorealisMessage::from_cbor(msg.data.as_ref())
+                .expect("[From CBOR bytes vector: message empty] Message decoding error").unwrap(),
+            MsgFormat::Json => BorealisMessage::from_json_bytes(msg.data.as_ref())
+                .expect("[From JSON bytes vector: message empty] Message decoding error").unwrap(),
+        };
+        // Get `StreamerMessage` from received Borealis Message
+        let (payload_bytes_decompressed, _payload_len) =  BorealisMessage::<Vec<u8>>::payload_decompress(&borealis_message.payload).unwrap();
+        let streamer_message: StreamerMessage = serde_json::from_slice(&payload_bytes_decompressed).unwrap();
+        streamer_message
+    } else {
+        // Decoding of Borealis Message receved from NATS subject
+        let borealis_message: BorealisMessage<StreamerMessage> = match context.msg_format {
+            MsgFormat::Cbor => BorealisMessage::from_cbor(msg.data.as_ref())
+                .expect("[From CBOR bytes vector: message empty] Message decoding error").unwrap(),
+            MsgFormat::Json => BorealisMessage::from_json_bytes(msg.data.as_ref())
+                .expect("[From JSON bytes vector: message empty] Message decoding error").unwrap(),
+        };
+        // Get `StreamerMessage` from received Borealis Message
+        let streamer_message: StreamerMessage = borealis_message.payload;
+        streamer_message
     };
-    // Get `StreamerMessage` from received Borealis Message
-    let streamer_message: StreamerMessage = borealis_message.payload;
 
     // Data handling from `StreamerMessage` data structure. For custom filtering purposes.
     // Same as: jq '{block_height: .block.header.height, block_hash: .block.header.hash, block_header_chunk: .block.chunks[0], shard_chunk_header: .shards[0].chunk.header, transactions: .shards[0].chunk.transactions, receipts: .shards[0].chunk.receipts, receipt_execution_outcomes: .shards[0].receipt_execution_outcomes, state_changes: .state_changes}'
@@ -604,7 +619,7 @@ fn main() {
                             );
                             if let Ok(msg) = subscription.next_timeout(std::time::Duration::from_millis(10000)) {
                                 info!(target: "borealis_consumer", "Received message:\n{}", &msg);
-                                message_consumer(msg, run_args.msg_format, opts.verbose);
+                                message_consumer(msg, run_args.clone(), opts.verbose);
                             } else {
                                 info!(
                                     target: "borealis_consumer",
@@ -640,7 +655,7 @@ fn main() {
                                 info!(target: "borealis_consumer", "Received message:\n{}", msg);
                                 Ok(msg.to_owned())
                             }) {
-                                message_consumer(message, run_args.msg_format, opts.verbose);
+                                message_consumer(message, run_args.clone(), opts.verbose);
                             } else {
                                 info!(
                                     target: "borealis_consumer",

@@ -62,6 +62,9 @@ pub(crate) struct RunArgs {
     /// Consuming messages format (`CBOR` or `JSON`), suffix for subject name
     #[clap(long, default_value = "CBOR")]
     pub msg_format: MsgFormat,
+    /// Flag for compressed payload of the Borealis Message
+    #[clap(long)]
+    pub payload_compressed: bool,
 }
 
 /// Consumer work mode
@@ -148,7 +151,7 @@ pub(crate) fn init_logging() {
 
     // Filters can be customized through RUST_LOG environment variable via CLI
     let mut env_filter = EnvFilter::new(
-        "tokio_reactor=info,near=info,near=error,stats=info,telemetry=info,near-performance-metrics=info,aggregated=info,near_indexer=info,borealis_indexer=info",
+        "tokio_reactor=info,near=info,near=error,stats=info,telemetry=info,near-performance-metrics=info,aggregated=info,near_indexer=info,borealis_indexer=info,borealis_consumer=info",
     );
 
     if let Ok(rust_log) = std::env::var("RUST_LOG") {

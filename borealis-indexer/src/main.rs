@@ -106,8 +106,7 @@ async fn message_producer(
     mut events_stream: mpsc::Receiver<near_indexer::StreamerMessage>,
     actual_connection_rx: watch::Receiver<NATSConnection>,
     connection_event_tx: mpsc::Sender<ConnectionEvent>,
-    subject: String,
-    msg_format: MsgFormat,
+    context: RunArgs,
     verbosity_level: Option<VerbosityLevel>,
 ) {
     info!(
@@ -355,16 +354,25 @@ async fn message_producer(
         );
 
         // Stream message to NATS
-        match msg_format {
+        match context.msg_format {
             MsgFormat::Cbor => loop {
                 let nats_connection = actual_connection_rx.borrow().clone();
                 debug!(target: "borealis_indexer", "Message Producer [CBOR bytes vector]: Current Connection: NATS Connection: {:?}", &nats_connection);
 
                 let result = nats_connection.connection.as_ref().unwrap()
                     .publish(
-                        format!("{}_{}", subject, msg_format.to_string()).as_str(),
-                        BorealisMessage::new(streamer_message.block.header.height, &streamer_message)
-                            .to_cbor(),
+                        context.subject.as_str(),
+                        BorealisMessage::new(streamer_message.block.header.height,
+                            if context.payload_compression {
+                                let payload_bytes = serde_json::to_vec(&streamer_message).unwrap();
+                                let (payload_bytes_compressed, _payload_len) = BorealisMessage::<Vec<u8>>::payload_compress(&payload_bytes).unwrap();
+                                payload_bytes_compressed
+                            } else { 
+                                serde_json::to_vec(&streamer_message).unwrap()
+                            }
+                        )
+                        .to_cbor()
+                        .unwrap(),
                     );
 
                 match &result {
@@ -396,9 +404,19 @@ async fn message_producer(
 
                 let result = nats_connection.connection.as_ref().unwrap()
                     .publish(
-                        format!("{}_{}", subject, msg_format.to_string()).as_str(),
-                        BorealisMessage::new(streamer_message.block.header.height, &streamer_message)
-                            .to_json_bytes(),
+                        context.subject.as_str(),
+                        BorealisMessage::new(
+                            streamer_message.block.header.height,
+                            if context.payload_compression {
+                                let payload_bytes = serde_json::to_vec(&streamer_message).unwrap();
+                                let (payload_bytes_compressed, _payload_len) = BorealisMessage::<Vec<u8>>::payload_compress(&payload_bytes).unwrap();
+                                payload_bytes_compressed
+                            } else { 
+                                serde_json::to_vec(&streamer_message).unwrap()
+                            }
+                        )
+                        .to_json_bytes()
+                        .unwrap(),
                     );
 
                 match &result {
@@ -1303,8 +1321,7 @@ fn main() -> Result<(), Error> {
                             events_stream,
                             actual_connection_receiver.clone(),
                             connection_event_sender.clone(),
-                            run_args.subject,
-                            run_args.msg_format,
+                            run_args.clone(),
                             opts.verbose,
                         )
                         .await;
