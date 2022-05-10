@@ -1,6 +1,6 @@
 use actix;
 use clap::Parser;
-use configs::{init_logging, MsgFormat, Opts, RunArgs, SubCommand, VerbosityLevel, WorkMode};
+use configs::{init_logging, MsgFormat, Opts, RunArgs, SubCommand, VerbosityLevel, WorkMode, CompressionMode};
 use nats;
 use nats::jetstream::{
     AckPolicy, Consumer, ConsumerConfig, DeliverPolicy, DiscardPolicy, ReplayPolicy,
@@ -10,7 +10,7 @@ use nats::jetstream::{
 use borealis_types::types::{BorealisMessage, StreamerMessage};
 use serde_cbor as cbor;
 use serde_json;
-use tracing::info;
+use tracing:: {info, error};
 
 pub mod configs;
 
@@ -257,7 +257,7 @@ fn message_consumer(
         "Message consumer loop executed: message received\n"
     );
 
-    let streamer_message = if context.payload_compressed {
+    let streamer_message = if let Some(compression_mode) = context.payload_compression {
         // Decoding of Borealis Message receved from NATS subject
         let borealis_message: BorealisMessage<Vec<u8>> = match context.msg_format {
             MsgFormat::Cbor => BorealisMessage::from_cbor(msg.data.as_ref())
@@ -266,7 +266,10 @@ fn message_consumer(
                 .expect("[From JSON bytes vector: message empty] Message decoding error").unwrap(),
         };
         // Get `StreamerMessage` from received Borealis Message
-        let (payload_bytes_decompressed, _payload_len) =  BorealisMessage::<Vec<u8>>::payload_decompress(&borealis_message.payload).unwrap();
+        let (payload_bytes_decompressed, _payload_len) = match compression_mode {
+            CompressionMode::Lz4f => BorealisMessage::<Vec<u8>>::payload_decompress_lz4(&borealis_message.payload).unwrap(),
+            CompressionMode::Zstd => BorealisMessage::<Vec<u8>>::payload_decompress_zstd(&borealis_message.payload).unwrap(),
+        };
         let streamer_message: StreamerMessage = serde_json::from_slice(&payload_bytes_decompressed).unwrap();
         streamer_message
     } else {
@@ -667,7 +670,10 @@ fn main() {
                     },
                 }
             });
-            system.run().unwrap();
+            system.run()
+                .unwrap_or_else(|error|
+                    error!(target: "borealis_consumer", "Main(): Run(): NATS' messages consuming and processing loop returned run-time error: {:?}", error)
+                );
         }
     }
 }

@@ -3,7 +3,7 @@ use borealis_types::types::BorealisMessage;
 use clap::Parser;
 use configs::{
     init_logging, AwaitSynced, Error, MsgFormat, Opts, RunArgs, SubCommand, SyncMode,
-    VerbosityLevel,
+    VerbosityLevel, CompressionMode,
 };
 use core::sync::atomic::{AtomicUsize, Ordering};
 use nats;
@@ -363,11 +363,14 @@ async fn message_producer(
                     .publish(
                         context.subject.as_str(),
                         BorealisMessage::new(streamer_message.block.header.height,
-                            if context.payload_compression {
+                            if let Some(compression_mode) = context.payload_compression {
                                 let payload_bytes = serde_json::to_vec(&streamer_message).unwrap();
-                                let (payload_bytes_compressed, _payload_len) = BorealisMessage::<Vec<u8>>::payload_compress(&payload_bytes).unwrap();
+                                let (payload_bytes_compressed, _payload_len) = match compression_mode {
+                                    CompressionMode::Lz4f => BorealisMessage::<Vec<u8>>::payload_compress_lz4(&payload_bytes).unwrap(),
+                                    CompressionMode::Zstd => BorealisMessage::<Vec<u8>>::payload_compress_zstd(&payload_bytes).unwrap(),
+                                };
                                 payload_bytes_compressed
-                            } else { 
+                            } else {
                                 serde_json::to_vec(&streamer_message).unwrap()
                             }
                         )
@@ -407,9 +410,12 @@ async fn message_producer(
                         context.subject.as_str(),
                         BorealisMessage::new(
                             streamer_message.block.header.height,
-                            if context.payload_compression {
+                            if let Some(compression_mode) = context.payload_compression {
                                 let payload_bytes = serde_json::to_vec(&streamer_message).unwrap();
-                                let (payload_bytes_compressed, _payload_len) = BorealisMessage::<Vec<u8>>::payload_compress(&payload_bytes).unwrap();
+                                let (payload_bytes_compressed, _payload_len) = match compression_mode {
+                                    CompressionMode::Lz4f => BorealisMessage::<Vec<u8>>::payload_compress_lz4(&payload_bytes).unwrap(),
+                                    CompressionMode::Zstd => BorealisMessage::<Vec<u8>>::payload_compress_zstd(&payload_bytes).unwrap(),
+                                };
                                 payload_bytes_compressed
                             } else { 
                                 serde_json::to_vec(&streamer_message).unwrap()

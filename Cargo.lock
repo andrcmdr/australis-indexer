@@ -589,8 +589,8 @@ dependencies = [
 
 [[package]]
 name = "borealis-types"
-version = "0.9.0"
-source = "git+ssh://git@github.com/aurora-is-near/borealis.rs.git?branch=stable#c9143dff68547522de5139b12c25583407d90edc"
+version = "0.10.0"
+source = "git+ssh://git@github.com/aurora-is-near/borealis.rs.git?branch=stable#e98581012a0aff37d1f1fa988e3b29059051cb4a"
 dependencies = [
  "lzzzz",
  "near-primitives",
@@ -598,6 +598,7 @@ dependencies = [
  "serde",
  "serde_cbor",
  "serde_json",
+ "zstd",
 ]
 
 [[package]]
@@ -2537,8 +2538,8 @@ dependencies = [
 
 [[package]]
 name = "near-indexer"
-version = "0.9.0"
-source = "git+ssh://git@github.com/aurora-is-near/borealis.rs.git?branch=stable#c9143dff68547522de5139b12c25583407d90edc"
+version = "0.10.0"
+source = "git+ssh://git@github.com/aurora-is-near/borealis.rs.git?branch=stable#e98581012a0aff37d1f1fa988e3b29059051cb4a"
 dependencies = [
  "actix",
  "anyhow",
@@ -5628,6 +5629,25 @@ dependencies = [
  "quote",
  "syn",
  "synstructure",
+]
+
+[[package]]
+name = "zstd"
+version = "0.10.2+zstd.1.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f4a6bd64f22b5e3e94b4e238669ff9f10815c27a5180108b849d24174a83847"
+dependencies = [
+ "zstd-safe",
+]
+
+[[package]]
+name = "zstd-safe"
+version = "4.1.6+zstd.1.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "94b61c51bb270702d6167b8ce67340d2754b088d0c091b06e593aa772c3ee9bb"
+dependencies = [
+ "libc",
+ "zstd-sys",
 ]
 
 [[package]]

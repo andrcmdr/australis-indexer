@@ -64,7 +64,7 @@ pub(crate) struct RunArgs {
     pub msg_format: MsgFormat,
     /// Flag for compressed payload of the Borealis Message
     #[clap(long)]
-    pub payload_compressed: bool,
+    pub payload_compression: Option<CompressionMode>,
 }
 
 /// Consumer work mode
@@ -118,6 +118,29 @@ impl ToString for MsgFormat {
         match self {
             MsgFormat::Cbor => String::from("CBOR"),
             MsgFormat::Json => String::from("JSON"),
+        }
+    }
+}
+
+/// Compression mode for NATS Message payload
+#[derive(Parser, Debug, Clone, Copy)]
+pub(crate) enum CompressionMode {
+    Lz4f,
+    Zstd,
+}
+
+impl FromStr for CompressionMode {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let input = s.to_lowercase();
+        match input.as_str() {
+            "lz4f" => Ok(CompressionMode::Lz4f),
+            "zstd" => Ok(CompressionMode::Zstd),
+            _ => Err(
+                "Unknown payload compression mode: `--payload-compression` should be `LZ4F` or `Zstd`"
+                    .to_string()
+                    .into(),
+            ),
         }
     }
 }
