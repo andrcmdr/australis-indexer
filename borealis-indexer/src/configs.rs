@@ -59,13 +59,13 @@ pub(crate) struct RunArgs {
     /// Example: "nats://borealis.aurora.dev:4222" or "tls://borealis.aurora.dev:4443" for TLS connection
     #[clap(
         long,
-        default_value = "tls://eastcoast.nats.backend.aurora.dev:4222,tls://westcoast.nats.backend.aurora.dev:4222"
+        default_value = "tls://europe.nats.backend.aurora.dev:4222,tls://eastcoast.nats.backend.aurora.dev:4222,tls://westcoast.nats.backend.aurora.dev:4222"
     )]
     pub nats_server: String,
     /// Stream messages to subject
-    #[clap(long, default_value = "BlockIndex_StreamerMessages")]
+    #[clap(long, default_value = "BlockIndex_StreamerMessages_CBOR")]
     pub subject: String,
-    /// Streaming messages format (`CBOR` or `JSON`), suffix for subject name
+    /// Streaming messages format (`CBOR` or `JSON`)
     #[clap(long, default_value = "CBOR")]
     pub msg_format: MsgFormat,
     /// Compress the payload of Borealis Message
@@ -180,7 +180,8 @@ impl FromStr for AwaitSynced {
 }
 
 /// Verbosity level for messages dump to log and stdout:
-/// WithBlockHashHeight - output only block height & hash
+/// WithRuntimeThreadsDump - full dump of run-time Tokio reactor activity and threads state in a thread pool
+/// (threads start/stop/park/unpark) for run-time debugging
 /// WithStreamerMessageDump - full dump of `StreamerMessage`
 /// WithStreamerMessageParse - full dump with full parse of `StreamerMessage`
 #[derive(Parser, Debug, Clone, Copy, Eq, PartialEq)]
@@ -198,7 +199,7 @@ impl FromStr for VerbosityLevel {
             "0" | "withruntimethreadsdump" => Ok(VerbosityLevel::WithRuntimeThreadsDump),
             "1" | "withstreamermessagedump" => Ok(VerbosityLevel::WithStreamerMessageDump),
             "2" | "withstreamermessageparse" => Ok(VerbosityLevel::WithStreamerMessageParse),
-            _ => Err("Unknown output verbosity level: `--verbose` should be `WithBlockHashHeight` (`0`), `WithStreamerMessageDump` (`1`) or `WithStreamerMessageParse` (`2`)".to_string().into()),
+            _ => Err("Unknown output verbosity level: `--verbose` should be `WithRuntimeThreadsDump` (`0`), `WithStreamerMessageDump` (`1`) or `WithStreamerMessageParse` (`2`)".to_string().into()),
         }
     }
 }
@@ -266,7 +267,6 @@ impl From<InitConfigArgs> for near_indexer::InitConfigArgs {
 
 /// Initialize logging
 pub(crate) fn init_logging() {
-
     // Filters can be customized through RUST_LOG environment variable via CLI
     let mut env_filter = EnvFilter::new(
         "tokio_reactor=info,near=info,near=error,stats=info,telemetry=info,near-performance-metrics=info,aggregated=info,near_indexer=info,borealis_indexer=info,borealis_consumer=info",
@@ -290,5 +290,4 @@ pub(crate) fn init_logging() {
         .with_env_filter(env_filter)
         .with_writer(std::io::stdout)
         .init();
-
 }

@@ -50,7 +50,7 @@ pub(crate) struct RunArgs {
     /// Example: "nats://borealis.aurora.dev:4222" or "tls://borealis.aurora.dev:4443" for TLS connection
     #[clap(
         long,
-        default_value = "tls://eastcoast.nats.backend.aurora.dev:4222,tls://westcoast.nats.backend.aurora.dev:4222"
+        default_value = "tls://europe.nats.backend.aurora.dev:4222,tls://eastcoast.nats.backend.aurora.dev:4222,tls://westcoast.nats.backend.aurora.dev:4222"
     )]
     pub nats_server: String,
     /// Consumer work mode (standard `Subscriber` or `JetStream` subscriber)
@@ -171,7 +171,6 @@ impl FromStr for VerbosityLevel {
 
 /// Initialize logging
 pub(crate) fn init_logging() {
-
     // Filters can be customized through RUST_LOG environment variable via CLI
     let mut env_filter = EnvFilter::new(
         "tokio_reactor=info,near=info,near=error,stats=info,telemetry=info,near-performance-metrics=info,aggregated=info,near_indexer=info,borealis_indexer=info,borealis_consumer=info",
@@ -195,5 +194,4 @@ pub(crate) fn init_logging() {
         .with_env_filter(env_filter)
         .with_writer(std::io::stdout)
         .init();
-
 }
